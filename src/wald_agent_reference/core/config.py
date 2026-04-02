@@ -22,10 +22,12 @@ class AppSettings(BaseModel):
     vector_dim: int = 256
     vector_weight: float = 0.7
     lexical_weight: float = 0.3
+    retrieval_backend: str = "auto"
     vector_store_dir: str = "outputs/vector_store"
     structured_store_path: str = "outputs/structured_memory.db"
-    memory_backend: str = "sqlite"
-    supermemory_container_tag: str = "adobe-ai-agent"
+    memory_backend: str = "supermemory"
+    supermemory_container_tag: str = "wald-agent-reference"
+    supermemory_search_mode: str = "hybrid"
     log_level: str = "INFO"
     log_file: str = "outputs/logs/agent.log"
     plot_dpi: int = 150

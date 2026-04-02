@@ -22,6 +22,9 @@ class MemoryBackend:
     def sync_chunk(self, chunk: DocumentChunk) -> None:
         raise NotImplementedError
 
+    def search(self, query: str, limit: int) -> list[dict[str, object]]:
+        raise NotImplementedError
+
 
 class NullMemoryBackend(MemoryBackend):
     def sync_document(self, document: ExtractedDocument) -> None:
@@ -35,6 +38,9 @@ class NullMemoryBackend(MemoryBackend):
 
     def sync_chunk(self, chunk: DocumentChunk) -> None:
         return None
+
+    def search(self, query: str, limit: int) -> list[dict[str, object]]:
+        return []
 
 
 @dataclass
@@ -67,6 +73,34 @@ class SupermemoryBackend(MemoryBackend):
         with urllib.request.urlopen(request, timeout=30):
             self.logger.debug("Synced object to Supermemory with custom_id=%s", custom_id)
             return None
+
+    def search(self, query: str, limit: int) -> list[dict[str, object]]:
+        if not self.settings.supermemory_api_key:
+            return []
+        payload_dict = {
+            "q": query,
+            "limit": limit,
+            "searchMode": self.settings.supermemory_search_mode,
+            "containerTags": [self.settings.supermemory_container_tag],
+        }
+        payload = json.dumps(payload_dict).encode("utf-8")
+        request = urllib.request.Request(
+            url="https://api.supermemory.ai/v4/search",
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.settings.supermemory_api_key}",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                body = json.loads(response.read().decode("utf-8") or "{}")
+        except Exception as exc:
+            self.logger.warning("Supermemory search failed for query '%s': %s", query, exc)
+            return []
+        results = body.get("results") or body.get("items") or body.get("data", {}).get("results") or []
+        return [result for result in results if isinstance(result, dict)]
 
     def sync_document(self, document: ExtractedDocument) -> None:
         self._post_document(

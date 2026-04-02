@@ -6,6 +6,7 @@ from ..ingestion.ingest import DocumentIngestor
 from ..reasoning.answer import AnswerComposer
 from ..reasoning.planner import PlannerAgent
 from ..retrieval.retrieve import HybridRetriever
+from ..retrieval.supermemory_retrieve import SupermemoryRetriever
 from .config import AppSettings, load_settings
 from .logging import configure_logging, get_logger
 from .models import AgentResponse, StructuredTable
@@ -47,8 +48,7 @@ class LeadershipInsightAgent:
             self.tools.memory_backend.sync_table(table)
         for visual in corpus.visuals.values():
             self.tools.memory_backend.sync_visual(visual)
-        retriever = HybridRetriever(corpus, self.settings)
-        retrieved = retriever.search(question)
+        retrieved = self._retrieve_evidence(question, plan, corpus)
         self.logger.info("Retriever returned %d chunks", len(retrieved))
         # Bind retrieved evidence back to the higher-fidelity structured objects before reasoning.
         table_ids = {
@@ -93,6 +93,28 @@ class LeadershipInsightAgent:
         self._persist_report(response)
         self.logger.info("Response persisted for question: %s", question)
         return response
+
+    def _retrieve_evidence(self, question: str, plan, corpus) -> list:
+        local_results = HybridRetriever(corpus, self.settings).search(question)
+        if self.settings.retrieval_backend not in {"auto", "supermemory"}:
+            return local_results
+
+        memory_results = SupermemoryRetriever(corpus, self.tools.memory_backend).search(question, self.settings.top_k)
+        if not memory_results:
+            self.logger.info("Supermemory retrieval unavailable or empty, falling back to local hybrid retrieval")
+            return local_results
+
+        merged = []
+        seen: set[str] = set()
+        for item in memory_results + local_results:
+            if item.chunk.chunk_id in seen:
+                continue
+            seen.add(item.chunk.chunk_id)
+            merged.append(item)
+            if len(merged) >= self.settings.top_k:
+                break
+        self.logger.info("Using Supermemory-assisted retrieval for %s route", plan.primary_route)
+        return merged
 
     def _persist_report(self, response: AgentResponse) -> None:
         self.settings.reports_path.mkdir(parents=True, exist_ok=True)

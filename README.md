@@ -1,14 +1,13 @@
 # Wald Agent Reference
 
-This repository is my submission for the initial assessment.
-
-Wald Agent Reference is a grounded document intelligence agent for enterprise documents. It can ingest `PDF`, `DOCX`, `XLSX/XLS`, `CSV/TSV`, `TXT`, `MD`, and simple visual attachments, retrieve relevant evidence, perform deterministic numeric analysis, answer cross-table questions through SQLite-backed SQL, and generate plots when useful.
+Wald Agent Reference is a grounded document intelligence agent for enterprise documents. It ingests `PDF`, `DOCX`, `XLSX/XLS`, `CSV/TSV`, `TXT`, `MD`, and visual attachments, preserves structured tables, performs deterministic calculations, and generates concise answers with source references.
 
 ## What the system does
 
 - Ingests narrative and structured business documents from a local folder
 - Preserves spreadsheet and document tables as structured data
 - Stores extracted structured data in SQLite for reliable querying
+- Uses Supermemory as an optional retrieval layer for narrative and visual questions
 - Uses a planner to choose the right route for each query:
   - retrieval
   - calculator
@@ -25,7 +24,8 @@ Wald Agent Reference is a grounded document intelligence agent for enterprise do
 - Cross-table questions are answered through SQL over SQLite
 - Long documents are chunked for retrieval, while canonical extracted content is also preserved
 - Visual artifacts such as charts can be parsed and used in answers
-- Supermemory integration is optional; SQLite remains the default local memory layer
+- SQLite remains the source of truth for structured tables and SQL-based reasoning
+- Supermemory is used as an optional retrieval layer, with local hybrid retrieval as fallback
 
 ## Requirements
 
@@ -56,11 +56,10 @@ The example file is:
 
 ```env
 GEMINI_API_KEY=
-OPENAI_API_KEY=
 SUPERMEMORY_API_KEY=
 ```
 
-Only `GEMINI_API_KEY` is needed for the primary live model path. The project still runs without API keys using local fallback paths.
+The project runs without API keys using local fallback paths. Add `GEMINI_API_KEY` for live model formatting and `SUPERMEMORY_API_KEY` for managed retrieval.
 
 ## How to run
 
@@ -101,43 +100,8 @@ src/wald_agent_reference/rendering/       Plot generation
 tests/                           Automated tests
 ```
 
-## Output behavior
-
-Each answer includes:
-
-- a planned approach
-- a concise executive summary
-- key findings
-- calculation / SQL trace when applicable
-- source references with file links
-- plot output when generated
-
-The agent is designed to abstain when the requested information is not supported by the provided documents.
-
-Logs are written to `outputs/logs/agent.log` by default so execution flow and failure points are traceable.
-
-Runtime artifacts such as logs, plots, reports, vector index files, and SQLite memory files are excluded from git via [.gitignore](/Users/alankalex/Desktop/Alan%20K%20Alex/Projects/Adobe%20ai%20engineer%20task/.gitignore).
-
-## Testing
-
-Run:
+## Optional validation
 
 ```bash
 .venv/bin/python -m pytest
 ```
-
-The test suite covers:
-
-- ingestion
-- multi-page PDF and complex workbook fixtures
-- spreadsheet parsing
-- SQLite persistence
-- SQL-agent joins
-- planner routing
-- grounding / abstention
-- visual extraction
-- end-to-end visual and logging paths
-- visualization
-- answer formatting
-
-Current status: `27` tests passing.

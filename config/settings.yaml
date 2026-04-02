@@ -10,10 +10,12 @@ vector_backend: auto
 vector_dim: 256
 vector_weight: 0.7
 lexical_weight: 0.3
+retrieval_backend: auto
 vector_store_dir: outputs/vector_store
 structured_store_path: outputs/structured_memory.db
-memory_backend: sqlite
-supermemory_container_tag: adobe-ai-agent
+memory_backend: supermemory
+supermemory_container_tag: wald-agent-reference
+supermemory_search_mode: hybrid
 log_level: INFO
 log_file: outputs/logs/agent.log
 plot_dpi: 150
