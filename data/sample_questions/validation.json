@@ -1,0 +1,28 @@
+[
+  {
+    "question": "What is our current revenue trend?",
+    "expected_keywords": ["increasing", "revenue", "growth"],
+    "expected_sources": ["revenue_trend.csv [Sheet1]"],
+    "expected_numeric": 14.29,
+    "generate_plot": true
+  },
+  {
+    "question": "Which departments are underperforming?",
+    "expected_keywords": ["support", "finance", "performance score"],
+    "expected_sources": ["department_scorecard.csv [Sheet1]"],
+    "generate_plot": true
+  },
+  {
+    "question": "What were the key risks highlighted in the last quarter?",
+    "expected_keywords": ["support bottleneck", "hiring delay", "margin leakage"],
+    "expected_sources": ["risk_register.csv [Sheet1]"],
+    "generate_plot": false
+  },
+  {
+    "question": "Which region missed revenue plan by the largest amount?",
+    "expected_keywords": ["europe", "variance", "target"],
+    "expected_sources": ["regional_actuals.csv [Sheet1]", "regional_targets.csv [Sheet1]"],
+    "expected_numeric": -5.0,
+    "generate_plot": true
+  }
+]

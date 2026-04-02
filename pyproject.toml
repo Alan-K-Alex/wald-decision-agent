@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wald-agent-reference"
+version = "0.1.0"
+description = "Leadership insight agent for enterprise document QA with spreadsheet-aware calculations."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "pandas>=2.2.0",
+  "numpy>=1.26.0",
+  "matplotlib>=3.8.0",
+  "pydantic>=2.6.0",
+  "PyYAML>=6.0.1",
+  "python-dotenv>=1.0.1",
+  "pypdf>=4.2.0",
+  "pdfplumber>=0.11.0",
+  "python-docx>=1.1.0",
+  "openpyxl>=3.1.2",
+  "xlrd>=2.0.1",
+  "reportlab>=4.2.0",
+  "google-genai>=1.0.0",
+  "openai>=1.35.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.2.0"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

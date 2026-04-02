@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+  <title>Quarterly Revenue Trend</title>
+  <rect width="640" height="360" fill="#ffffff"/>
+  <text x="40" y="32" font-size="24">Quarterly Revenue Trend</text>
+  <text x="40" y="330" font-size="16">Q1</text>
+  <text x="180" y="330" font-size="16">Q2</text>
+  <text x="320" y="330" font-size="16">Q3</text>
+  <text x="460" y="330" font-size="16">Q4</text>
+  <text x="24" y="280" font-size="14">120</text>
+  <text x="24" y="210" font-size="14">138</text>
+  <text x="24" y="180" font-size="14">140</text>
+  <text x="24" y="90" font-size="14">160</text>
+  <rect x="70" y="240" width="70" height="60" fill="#74c0fc"/>
+  <rect x="210" y="210" width="70" height="90" fill="#4dabf7"/>
+  <rect x="350" y="200" width="70" height="100" fill="#339af0"/>
+  <rect x="490" y="160" width="70" height="140" fill="#1c7ed6"/>
+</svg>

@@ -1,0 +1,6 @@
+Risk Category,Severity,Status,Owner
+Support Bottleneck,High,Open,Operations
+Contractor Dependence,Medium,Open,Support
+Forecast Accuracy,Medium,Mitigated,Finance
+Hiring Delay,High,Open,Engineering
+Margin Leakage,High,Open,Support
