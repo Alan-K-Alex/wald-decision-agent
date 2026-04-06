@@ -79,6 +79,7 @@ class DocumentIngestor:
                 continue
             headers = [header if header else f"column_{idx + 1}" for idx, header in enumerate(rows[0])]
             frame = pd.DataFrame(rows[1:], columns=headers).dropna(how="all").reset_index(drop=True)
+            frame.insert(0, "_source_row", list(range(2, len(frame) + 2)))
             structured_table = StructuredTable(
                 table_id=f"{path.stem}:table:{index}",
                 source_path=path,
@@ -88,7 +89,10 @@ class DocumentIngestor:
                     "sheet_name": f"Table {index}",
                     "source_file": path.name,
                     "table_name": f"Table {index}",
-                    "columns": list(frame.columns),
+                    "columns": [column for column in frame.columns if not str(column).startswith("_")],
+                    "source_range": f"Table {index} rows 2-{len(frame) + 1}",
+                    "header_rows": 1,
+                    "row_count": len(frame),
                 },
                 retrieval_text=self.spreadsheet_parser._build_retrieval_text(path, f"Table {index}", frame),
             )
@@ -101,6 +105,8 @@ class DocumentIngestor:
         chunks: list[DocumentChunk] = []
         for page_idx, page in enumerate(reader.pages, start=1):
             page_text = compact_whitespace(page.extract_text() or "")
+            if not page_text:
+                page_text = self._extract_pdf_page_with_gemini(page)
             full_pages.append(page_text)
             if not page_text:
                 continue
@@ -123,6 +129,43 @@ class DocumentIngestor:
             metadata={"file_hash": sha256_file(path), "text_hash": sha256_text(raw_text), "page_count": len(reader.pages)},
         )
         return document, chunks
+
+    def _extract_pdf_page_with_gemini(self, page) -> str:
+        if not self.settings.gemini_api_key:
+            return ""
+        try:
+            from google import genai
+            from google.genai import types
+        except ImportError:
+            return ""
+
+        image_parts: list[object] = []
+        for image in getattr(page, "images", []) or []:
+            data = getattr(image, "data", None)
+            if not data:
+                continue
+            try:
+                image_parts.append(types.Part.from_bytes(data=data, mime_type="image/png"))
+            except Exception:
+                continue
+        if not image_parts:
+            return ""
+        prompt = (
+            "Extract readable business text from this scanned document page. "
+            "Return plain text only. Preserve numbers and headings. Do not infer missing values."
+        )
+        try:
+            client = genai.Client(api_key=self.settings.gemini_api_key)
+            response = client.models.generate_content(
+                model=self.settings.vision_model,
+                contents=[prompt, *image_parts],
+            )
+        except Exception:
+            return ""
+        text = compact_whitespace(getattr(response, "text", "") or "")
+        if text:
+            self.logger.info("Used Gemini vision fallback for image-based PDF page")
+        return text
 
     def _chunk_text(self, text: str, path: Path, source_type: str) -> tuple[ExtractedDocument, list[DocumentChunk]]:
         cleaned = compact_whitespace(text)

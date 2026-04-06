@@ -37,9 +37,10 @@ class CalculationEngine:
     def _calculate_trend(self, question: str, tables: list[StructuredTable]) -> CalculationResult | None:
         target_metric = self._detect_target_metric(question)
         for table in tables:
-            series = self._extract_series(table.dataframe, target_metric)
-            if not series:
+            extracted = self._extract_series(table.dataframe, target_metric)
+            if not extracted:
                 continue
+            series, source_row = extracted
             labels = list(series.keys())
             values = list(series.values())
             if len(values) < 2:
@@ -55,6 +56,8 @@ class CalculationEngine:
             ]
             trace = [
                 f"Source workbook/table: {table.source_path.name} / {table.metadata.get('sheet_name', 'Sheet1')}",
+                f"Source row: {source_row}" if source_row is not None else "Source row: not available",
+                f"Source range: {table.metadata.get('source_range', 'not available')}",
                 f"Series used: {', '.join(f'{label}={value:,.2f}' for label, value in series.items())}",
                 f"Growth formula: (({values[-1]:,.2f} - {values[-2]:,.2f}) / {values[-2]:,.2f}) * 100 = {growth:,.2f}%",
             ]
@@ -62,7 +65,9 @@ class CalculationEngine:
                 answer=answer,
                 findings=findings,
                 trace=trace,
-                evidence_refs=[f"{table.source_path.name} [{table.metadata.get('sheet_name', 'Sheet1')}]"],
+                evidence_refs=[
+                    f"{table.source_path.name} [{table.metadata.get('sheet_name', 'Sheet1')} | row {source_row if source_row is not None else '?'} | range {table.metadata.get('source_range', 'n/a')}]"
+                ],
                 chart_data={"type": "line", "labels": labels, "values": values, "title": f"{target_metric.title()} trend"},
                 numeric_value=growth,
             )
@@ -89,18 +94,22 @@ class CalculationEngine:
             findings = [
                 f"Ranking uses `{metric_col}` from sheet `{table.metadata.get('sheet_name', 'Sheet1')}`.",
             ] + [
-                f"{row[dimension_col]} = {row[metric_col]:,.2f}" for _, row in selected.iterrows()
+                f"{row[dimension_col]} = {row[metric_col]:,.2f} (source row {int(row['_source_row']) if '_source_row' in row and pd.notna(row['_source_row']) else '?'})"
+                for _, row in selected.iterrows()
             ]
             trace = [
                 f"Dimension column: {dimension_col}",
                 f"Metric column: {metric_col}",
                 f"Source workbook/table: {table.source_path.name} / {table.metadata.get('sheet_name', 'Sheet1')}",
+                f"Source range: {table.metadata.get('source_range', 'not available')}",
             ]
             return CalculationResult(
                 answer=answer,
                 findings=findings,
                 trace=trace,
-                evidence_refs=[f"{table.source_path.name} [{table.metadata.get('sheet_name', 'Sheet1')}]"],
+                evidence_refs=[
+                    f"{table.source_path.name} [{table.metadata.get('sheet_name', 'Sheet1')} | row {int(best_row['_source_row']) if '_source_row' in best_row and pd.notna(best_row['_source_row']) else '?'} | metric {metric_col}]"
+                ],
                 chart_data={
                     "type": "bar",
                     "labels": selected[dimension_col].astype(str).tolist(),
@@ -142,8 +151,9 @@ class CalculationEngine:
                     f"Operation: {op_label.lower()}",
                     f"Column used: {metric_col}",
                     f"Source workbook/table: {table.source_path.name} / {table.metadata.get('sheet_name', 'Sheet1')}",
+                    f"Source range: {table.metadata.get('source_range', 'not available')}",
                 ],
-                evidence_refs=[f"{table.source_path.name} [{table.metadata.get('sheet_name', 'Sheet1')}]"],
+                evidence_refs=[f"{table.source_path.name} [{table.metadata.get('sheet_name', 'Sheet1')} | column {metric_col}]"],
                 numeric_value=value,
             )
         return None
@@ -159,13 +169,13 @@ class CalculationEngine:
         tokens = tokenize(question)
         return tokens[-1] if tokens else "metric"
 
-    def _extract_series(self, frame: pd.DataFrame, target_metric: str) -> dict[str, float] | None:
+    def _extract_series(self, frame: pd.DataFrame, target_metric: str) -> tuple[dict[str, float], int | None] | None:
         frame = frame.copy()
         metric_columns = [column for column in frame.columns if self._looks_temporal(column)]
         if not metric_columns:
             return self._extract_series_from_long_format(frame, target_metric)
 
-        id_columns = [column for column in frame.columns if column not in metric_columns]
+        id_columns = [column for column in frame.columns if column not in metric_columns and not str(column).startswith("_")]
         if not id_columns:
             row = frame.iloc[0]
             series = {}
@@ -173,7 +183,7 @@ class CalculationEngine:
                 value = pd.to_numeric(pd.Series([row[column]]), errors="coerce").iloc[0]
                 if pd.notna(value):
                     series[str(column)] = float(value)
-            return series or None
+            return (series, int(row["_source_row"]) if "_source_row" in row and pd.notna(row["_source_row"]) else None) if series else None
 
         for _, row in frame.iterrows():
             row_text = " ".join(compact_whitespace(str(row[column])).lower() for column in id_columns)
@@ -184,10 +194,10 @@ class CalculationEngine:
                     if pd.notna(value):
                         series[str(column)] = float(value)
                 if series:
-                    return series
+                    return series, (int(row["_source_row"]) if "_source_row" in row and pd.notna(row["_source_row"]) else None)
         return None
 
-    def _extract_series_from_long_format(self, frame: pd.DataFrame, target_metric: str) -> dict[str, float] | None:
+    def _extract_series_from_long_format(self, frame: pd.DataFrame, target_metric: str) -> tuple[dict[str, float], int | None] | None:
         lowered_columns = {str(column).lower(): column for column in frame.columns}
         time_col = next((column for name, column in lowered_columns.items() if name in {"period", "quarter", "month", "year"}), None)
         metric_col = next((column for name, column in lowered_columns.items() if target_metric in name), None)
@@ -195,7 +205,10 @@ class CalculationEngine:
             series_frame = frame[[time_col, metric_col]].copy()
             series_frame[metric_col] = pd.to_numeric(series_frame[metric_col], errors="coerce")
             series_frame = series_frame.dropna(subset=[metric_col])
-            return {str(row[time_col]): float(row[metric_col]) for _, row in series_frame.iterrows()} or None
+            if series_frame.empty:
+                return None
+            source_row = int(series_frame.iloc[0]["_source_row"]) if "_source_row" in series_frame.columns and pd.notna(series_frame.iloc[0]["_source_row"]) else None
+            return {str(row[time_col]): float(row[metric_col]) for _, row in series_frame.iterrows()} or None, source_row
         return None
 
     def _extract_ranking(self, frame: pd.DataFrame, target_metric: str) -> tuple[str, str, pd.DataFrame] | None:
@@ -208,7 +221,7 @@ class CalculationEngine:
         if prepared.empty:
             return None
 
-        non_numeric = [column for column in prepared.columns if column != metric_col]
+        non_numeric = [column for column in prepared.columns if column != metric_col and not str(column).startswith("_")]
         preferred = ["department", "business_unit", "business unit", "team", "region", "function"]
         dimension_col = next(
             (column for column in non_numeric if str(column).strip().lower() in preferred),
@@ -240,6 +253,8 @@ class CalculationEngine:
     def _numeric_columns(self, frame: pd.DataFrame) -> list[str]:
         numeric_columns: list[str] = []
         for column in frame.columns:
+            if str(column).startswith("_"):
+                continue
             series = pd.to_numeric(frame[column], errors="coerce")
             if series.notna().sum() >= max(2, len(frame) // 2):
                 numeric_columns.append(str(column))

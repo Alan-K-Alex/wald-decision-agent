@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 from docx import Document
 from openpyxl import Workbook
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -44,6 +45,18 @@ def generate_excel() -> None:
     risks.append(["North America", "Contractor Dependency", "High", "Mitigated", "Operations"])
 
     workbook.save(DATA_DIR / "board_financial_pack.xlsx")
+
+    messy = Workbook()
+    summary = messy.active
+    summary.title = "Messy Summary"
+    summary.merge_cells("A1:D1")
+    summary["A1"] = "Regional KPI Summary"
+    summary.append(["Region", "Revenue", None, "Risk"])
+    summary.append([None, "Actual", "Target", "Score"])
+    summary.append(["North America", 102, 108, 3])
+    summary.append(["Europe", 80, 87, 8])
+    summary.append(["APAC", 63, 66, 5])
+    messy.save(DATA_DIR / "messy_financial_pack.xlsx")
 
 
 def generate_pdf() -> None:
@@ -126,6 +139,19 @@ def generate_pdf() -> None:
         )
         story.append(Spacer(1, 8))
     doc.build(story)
+
+    fig, ax = plt.subplots(figsize=(7, 3))
+    ax.axis("off")
+    ax.text(0.05, 0.7, "Scanned Revenue Memo", fontsize=18, weight="bold")
+    ax.text(0.05, 0.42, "Europe revenue actual: 80", fontsize=14)
+    ax.text(0.05, 0.2, "Europe revenue target: 87", fontsize=14)
+    image_path = DATA_DIR / "scanned_revenue_page.png"
+    fig.savefig(image_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+    scanned_doc = SimpleDocTemplate(str(DATA_DIR / "scanned_revenue_pack.pdf"), pagesize=letter)
+    scanned_story = [Image(str(image_path), width=500, height=220)]
+    scanned_doc.build(scanned_story)
 
 
 def generate_docx() -> None:

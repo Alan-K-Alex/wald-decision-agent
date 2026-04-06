@@ -21,7 +21,7 @@ class VisualExtractor:
         artifact = self._parse_with_gemini(path)
         if artifact is not None:
             return artifact
-        return self._parse_with_ocr(path)
+        return None
 
     def _parse_svg(self, path: Path) -> VisualArtifact | None:
         text = path.read_text(encoding="utf-8")
@@ -57,7 +57,7 @@ class VisualExtractor:
         try:
             client = genai.Client(api_key=self.settings.gemini_api_key)
             response = client.models.generate_content(
-                model=self.settings.chat_model,
+                model=self.settings.vision_model,
                 contents=[
                     prompt,
                     types.Part.from_bytes(data=path.read_bytes(), mime_type=self._mime_type(path)),
@@ -87,27 +87,6 @@ class VisualExtractor:
             )
         except Exception:
             return None
-
-    def _parse_with_ocr(self, path: Path) -> VisualArtifact | None:
-        try:
-            import pytesseract
-            from PIL import Image
-        except ImportError:
-            return None
-        try:
-            text = compact_whitespace(pytesseract.image_to_string(Image.open(path)))
-        except Exception:
-            return None
-        if not text:
-            return None
-        return VisualArtifact(
-            artifact_id=f"{slugify(path.stem)}:{sha256_file(path)[:8]}",
-            source_path=path,
-            source_type="image",
-            extracted_text=text,
-            summary=f"Visual artifact extracted via OCR from {path.name}: {text}",
-            metadata={"title": path.stem, "extraction_backend": "ocr"},
-        )
 
     @staticmethod
     def _mime_type(path: Path) -> str:

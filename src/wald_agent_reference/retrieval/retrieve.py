@@ -17,7 +17,11 @@ class HybridRetriever:
         self.logger = get_logger("retrieval.hybrid")
         self.df = self._document_frequencies()
         self.chunk_lookup = {chunk.chunk_id: chunk for chunk in corpus.chunks}
-        self.vector_index = VectorIndex.build(corpus, settings)
+        try:
+            self.vector_index = VectorIndex.build(corpus, settings)
+        except Exception as exc:
+            self.logger.warning("Failed to build vector index: %s. Falling back to lexical-only retrieval.", exc)
+            self.vector_index = None
 
     def search(self, query: str, top_k: int | None = None) -> list[RetrievedChunk]:
         query_tokens = tokenize(query)
@@ -34,8 +38,13 @@ class HybridRetriever:
                 score += 0.2
             lexical_scores[chunk.chunk_id] = score
 
-        vector_hits = self.vector_index.search(query, top_k=max(k * 3, k))
-        vector_scores = {item.chunk_id: item.score for item in vector_hits}
+        vector_scores: dict[str, float] = {}
+        if self.vector_index is not None:
+            try:
+                vector_hits = self.vector_index.search(query, top_k=max(k * 3, k))
+                vector_scores = {item.chunk_id: item.score for item in vector_hits}
+            except Exception as exc:
+                self.logger.debug("Vector search failed, using lexical-only scores: %s", exc)
 
         combined_scores: list[RetrievedChunk] = []
         lexical_max = max(lexical_scores.values(), default=1.0) or 1.0
@@ -46,6 +55,10 @@ class HybridRetriever:
             if score > 0
         } | set(vector_scores)
         for chunk_id in candidate_ids:
+            # Verify chunk exists in lookup before processing
+            if chunk_id not in self.chunk_lookup:
+                self.logger.debug("Chunk %s not found in lookup, skipping", chunk_id)
+                continue
             lexical_score = lexical_scores.get(chunk_id, 0.0) / lexical_max
             vector_score = vector_scores.get(chunk_id, 0.0) / vector_max
             combined = self.settings.lexical_weight * lexical_score + self.settings.vector_weight * vector_score

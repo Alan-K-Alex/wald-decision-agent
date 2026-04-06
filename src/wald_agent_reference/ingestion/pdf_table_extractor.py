@@ -43,11 +43,12 @@ class PDFTableExtractor:
                     frame = pd.DataFrame(raw_table[1:], columns=headers).dropna(how="all").reset_index(drop=True)
                     if frame.empty:
                         continue
+                    frame.insert(0, "_source_row", list(range(2, len(frame) + 2)))
                     table_id = f"{path.stem}:page:{page_idx}:table:{table_idx}"
                     retrieval_text = (
                         f"PDF table from {path.name} page {page_idx}. "
                         f"Columns: {', '.join(map(str, frame.columns))}. "
-                        f"Preview rows: {' | '.join(map(str, frame.head(1).fillna('').iloc[0].tolist()))}"
+                        f"Preview rows: {' | '.join(map(str, frame[[column for column in frame.columns if not str(column).startswith('_')]].head(1).fillna('').iloc[0].tolist()))}"
                     )
                     tables.append(
                         StructuredTable(
@@ -60,7 +61,10 @@ class PDFTableExtractor:
                                 "sheet_name": f"Page {page_idx} Table {table_idx}",
                                 "table_name": f"Page {page_idx} Table {table_idx}",
                                 "source_file": path.name,
-                                "columns": list(frame.columns),
+                                "columns": [column for column in frame.columns if not str(column).startswith("_")],
+                                "source_range": f"Page {page_idx} Table {table_idx} rows 2-{len(frame) + 1}",
+                                "header_rows": 1,
+                                "row_count": len(frame),
                             },
                             retrieval_text=retrieval_text,
                         )

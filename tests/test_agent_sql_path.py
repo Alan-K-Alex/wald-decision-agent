@@ -26,4 +26,6 @@ def test_agent_answers_cross_table_variance_question(tmp_path: Path) -> None:
 
     markdown = response.to_markdown()
     assert "Europe has the largest negative variance" in markdown
+    assert "row" in markdown
+    assert "columns Region, Actual Revenue" in markdown or "columns Region, Revenue" in markdown
     assert response.plot_paths

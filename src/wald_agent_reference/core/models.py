@@ -84,6 +84,31 @@ class VisualizationResult:
     path: Path
     caption: str
     chart_type: str
+    base64_image: str = ""  # Base64-encoded PNG image data
+
+
+@dataclass
+class ChatResponse:
+    """Lightweight response optimized for chat UI display"""
+    question: str
+    answer: str
+    key_findings: list[str]
+    visual_insights: list[str] = field(default_factory=list)
+    plots_base64: list[str] = field(default_factory=list)
+    source_summary: str = ""
+    data_types_used: list[str] = field(default_factory=list)
+    
+    def to_dict(self) -> dict:
+        """Convert to dictionary for JSON serialization"""
+        return {
+            "question": self.question,
+            "answer": self.answer,
+            "key_findings": self.key_findings,
+            "visual_insights": self.visual_insights,
+            "plots_base64": self.plots_base64,
+            "source_summary": self.source_summary,
+            "data_types_used": self.data_types_used,
+        }
 
 
 @dataclass
@@ -98,6 +123,7 @@ class AgentResponse:
     source_references: list[str]
     visual_insights: list[str] = field(default_factory=list)
     plot_paths: list[Path] = field(default_factory=list)
+    plot_base64: str = ""  # Base64-encoded plot image for embedding
 
     def to_markdown(self) -> str:
         sections = [
@@ -115,3 +141,30 @@ class AgentResponse:
             plot_body = "\n".join(f"![plot]({path.resolve()})" for path in self.plot_paths)
             sections.append(("Plots", plot_body))
         return "\n\n".join(f"{title}\n{body}" for title, body in sections)
+
+    def to_chat_response(self) -> ChatResponse:
+        """Convert to concise chat response (title + findings + plots only)
+        
+        Returns a lightweight response optimized for UI display.
+        Full details (evidence, calculations, etc.) are preserved in to_markdown()
+        """
+        # Infer data types from source references
+        data_types = set()
+        for ref in self.source_references:
+            if ".csv" in ref or ".xlsx" in ref:
+                data_types.add("tables")
+            elif ".md" in ref or ".txt" in ref:
+                data_types.add("text")
+        if self.plot_base64 or self.plot_paths:
+            data_types.add("visuals")
+        
+        # Build concise response
+        return ChatResponse(
+            question=self.question,
+            answer=self.executive_summary,
+            key_findings=self.key_findings[:5],  # Limit to top 5
+            visual_insights=self.visual_insights,
+            plots_base64=[self.plot_base64] if self.plot_base64 else [],
+            source_summary=f"Referenced {len(self.source_references)} sources",
+            data_types_used=list(data_types),
+        )

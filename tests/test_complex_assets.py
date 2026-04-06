@@ -27,6 +27,10 @@ def test_complex_xlsx_creates_multiple_structured_tables(tmp_path: Path) -> None
     assert len(board_tables) == 3
     assert any(table.metadata["sheet_name"] == "Regional Actuals" for table in board_tables)
     assert any(table.metadata["sheet_name"] == "Regional Targets" for table in board_tables)
+    messy_tables = [table for table in corpus.tables.values() if table.source_path.name == "messy_financial_pack.xlsx"]
+    assert messy_tables
+    visible_columns = [column for column in messy_tables[0].dataframe.columns if not str(column).startswith("_")]
+    assert "Revenue Actual" in visible_columns
 
 
 def test_pdf_generated_fixture_extracts_text_and_tables(tmp_path: Path) -> None:
@@ -39,6 +43,10 @@ def test_pdf_generated_fixture_extracts_text_and_tables(tmp_path: Path) -> None:
     assert pdf_chunks
     assert pdf_tables
     assert pdf_document.metadata["page_count"] >= 2
+
+    scanned_document = corpus.documents.get("scanned_revenue_pack:document")
+    assert scanned_document is not None
+    assert scanned_document.source_path.name == "scanned_revenue_pack.pdf"
 
 
 def test_end_to_end_margin_plan_query_uses_complex_financial_pack(tmp_path: Path) -> None:

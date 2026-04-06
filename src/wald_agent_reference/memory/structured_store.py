@@ -149,6 +149,78 @@ class StructuredMemoryStore:
             )
         return entries
 
+    def get_all_tables(self) -> dict[str, StructuredTable] | None:
+        """Get all tables from catalog."""
+        catalog = self.load_catalog()
+        if not catalog:
+            return None
+        return {entry.table_id: entry for entry in catalog}
+
+    def load_all_chunks(self) -> list[DocumentChunk]:
+        """Load all chunks from the store."""
+        chunks: list[DocumentChunk] = []
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    "SELECT chunk_id, source_file, source_type, content, metadata_json FROM chunks"
+                ).fetchall()
+            for row in rows:
+                chunks.append(
+                    DocumentChunk(
+                        chunk_id=row[0],
+                        source_path=Path(row[1]),
+                        source_type=row[2],
+                        content=row[3],
+                        metadata=json.loads(row[4]),
+                    )
+                )
+        except Exception:
+            pass
+        return chunks
+
+    def load_all_documents(self) -> dict[str, ExtractedDocument]:
+        """Load all documents from the store."""
+        documents: dict[str, ExtractedDocument] = {}
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    "SELECT document_id, source_file, source_type, raw_text, metadata_json FROM documents"
+                ).fetchall()
+            for row in rows:
+                doc = ExtractedDocument(
+                    document_id=row[0],
+                    source_path=Path(row[1]),
+                    source_type=row[2],
+                    raw_text=row[3],
+                    metadata=json.loads(row[4]),
+                )
+                documents[row[0]] = doc
+        except Exception:
+            pass
+        return documents
+
+    def load_all_visuals(self) -> dict[str, VisualArtifact]:
+        """Load all visual artifacts from the store."""
+        visuals: dict[str, VisualArtifact] = {}
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    "SELECT artifact_id, source_file, source_type, extracted_text, summary, metadata_json FROM visual_artifacts"
+                ).fetchall()
+            for row in rows:
+                visual = VisualArtifact(
+                    artifact_id=row[0],
+                    source_path=Path(row[1]),
+                    source_type=row[2],
+                    extracted_text=row[3],
+                    summary=row[4],
+                    metadata=json.loads(row[5]),
+                )
+                visuals[row[0]] = visual
+        except Exception:
+            pass
+        return visuals
+
     def execute(self, sql: str) -> tuple[list[str], list[tuple[object, ...]]]:
         with self._connect() as conn:
             cursor = conn.execute(sql)

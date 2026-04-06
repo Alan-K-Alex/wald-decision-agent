@@ -15,6 +15,7 @@ class AppSettings(BaseModel):
     chunk_overlap: int = 150
     top_k: int = 5
     chat_model: str = "gemini-2.5-flash"
+    vision_model: str = "gemini-2.5-flash"
     embedding_model: str = "gemini-embedding-001"
     llm_provider: str = "gemini"
     enable_llm_formatting: bool = True
@@ -34,6 +35,7 @@ class AppSettings(BaseModel):
     output_dir: str = "outputs"
     reports_dir: str = "outputs/reports"
     plots_dir: str = "outputs/plots"
+    chats_dir: str = "outputs/chats"
 
     @property
     def openai_api_key(self) -> str | None:
@@ -78,6 +80,10 @@ class AppSettings(BaseModel):
     @property
     def log_path(self) -> Path:
         return Path(self.log_file)
+
+    @property
+    def chats_path(self) -> Path:
+        return Path(self.chats_dir)
 
 
 def load_settings(path: str | Path = "config/settings.yaml") -> AppSettings:

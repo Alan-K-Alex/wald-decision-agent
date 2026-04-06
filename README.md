@@ -8,6 +8,7 @@ Wald Agent Reference is a grounded document intelligence agent for enterprise do
 - Preserves spreadsheet and document tables as structured data
 - Stores extracted structured data in SQLite for reliable querying
 - Uses Supermemory as an optional retrieval layer for narrative and visual questions
+- Supports a chat-style web interface with folder upload and artifact links
 - Uses a planner to choose the right route for each query:
   - retrieval
   - calculator
@@ -23,18 +24,18 @@ Wald Agent Reference is a grounded document intelligence agent for enterprise do
 - Numeric answers are computed with deterministic Python logic instead of raw LLM arithmetic
 - Cross-table questions are answered through SQL over SQLite
 - Long documents are chunked for retrieval, while canonical extracted content is also preserved
-- Visual artifacts such as charts can be parsed and used in answers
+- Visual artifacts and scanned pages can be parsed with Gemini vision
 - SQLite remains the source of truth for structured tables and SQL-based reasoning
 - Supermemory is used as an optional retrieval layer, with local hybrid retrieval as fallback
+- Each chat stores its own uploaded files, vector index, reports, plots, and SQLite database
 
 ## Requirements
 
 - Python `3.11+` recommended
 - `pip`
 - Optional API keys:
-  - `GEMINI_API_KEY` for Gemini formatting / embeddings / visual extraction
+  - `GEMINI_API_KEY` for Gemini formatting, embeddings, and vision-based extraction
   - `SUPERMEMORY_API_KEY` for Supermemory sync
-- `tesseract` is optional if OCR is needed for image-heavy attachments
 
 ## Environment setup
 
@@ -59,11 +60,19 @@ GEMINI_API_KEY=
 SUPERMEMORY_API_KEY=
 ```
 
-The project runs without API keys using local fallback paths. Add `GEMINI_API_KEY` for live model formatting and `SUPERMEMORY_API_KEY` for managed retrieval.
+The project runs without API keys using local fallback paths. Add `GEMINI_API_KEY` for live model formatting and Gemini vision, and `SUPERMEMORY_API_KEY` for managed retrieval.
 
 ## How to run
 
-Run a sample question:
+Launch the web interface:
+
+```bash
+PYTHONPATH=src python -m wald_agent_reference.main serve --host 127.0.0.1 --port 8000
+```
+
+Then open [http://127.0.0.1:8000](http://127.0.0.1:8000), create a chat, upload a folder, and ask questions. Folder upload triggers ingestion immediately. Deleting a chat removes its chat-specific SQLite database, uploaded files, vector index, reports, and plots.
+
+Run a sample CLI question:
 
 ```bash
 PYTHONPATH=src python -m wald_agent_reference.main ask --docs data/raw --question "What is our current revenue trend?" --plot
@@ -74,6 +83,7 @@ More examples:
 ```bash
 PYTHONPATH=src python -m wald_agent_reference.main ask --docs data/raw --question "Which departments are underperforming?"
 PYTHONPATH=src python -m wald_agent_reference.main ask --docs data/raw --question "Which region missed revenue plan by the largest amount?" --plot
+PYTHONPATH=src python -m wald_agent_reference.main ask --docs data/raw --question "Why did Europe miss revenue plan by the largest amount?"
 PYTHONPATH=src python -m wald_agent_reference.main ask --docs data/raw --question "What does the quarterly revenue chart show?"
 ```
 

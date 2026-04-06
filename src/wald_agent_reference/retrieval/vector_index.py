@@ -111,6 +111,13 @@ class VectorIndex:
 
     @classmethod
     def build(cls, corpus: Corpus, settings: AppSettings) -> "VectorIndex":
+        """Build vector index, attempting to load from cache first if available."""
+        # Try loading from persisted cache
+        cached_index = cls.load(corpus, settings)
+        if cached_index is not None:
+            return cached_index
+        
+        # If cache miss, build fresh index
         embedder = cls._select_embedder(settings)
         chunks = {chunk.chunk_id: chunk for chunk in corpus.chunks}
         texts = [chunk.content for chunk in corpus.chunks]
@@ -118,6 +125,37 @@ class VectorIndex:
         index = cls(settings=settings, embedder=embedder, chunks=chunks, matrix=matrix)
         index.persist()
         return index
+
+    @classmethod
+    def load(cls, corpus: Corpus, settings: AppSettings) -> "VectorIndex | None":
+        """Load vector index from persisted cache."""
+        try:
+            store_dir = settings.vector_store_path
+            metadata_path = store_dir / "index_metadata.json"
+            matrix_path = store_dir / "chunk_vectors.npy"
+            
+            if not metadata_path.exists() or not matrix_path.exists():
+                return None
+            
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            matrix = np.load(matrix_path)
+            
+            # Verify the cached index is compatible with current corpus
+            cached_chunk_ids = set(metadata.get("chunk_ids", []))
+            current_chunk_ids = {chunk.chunk_id for chunk in corpus.chunks}
+            
+            if cached_chunk_ids != current_chunk_ids:
+                # Cache is stale - need to rebuild
+                return None
+            
+            # Reconstruct the embedder and chunks mapping
+            embedder = cls._select_embedder(settings)
+            chunks = {chunk.chunk_id: chunk for chunk in corpus.chunks}
+            
+            index = cls(settings=settings, embedder=embedder, chunks=chunks, matrix=matrix)
+            return index
+        except Exception as exc:
+            return None  # If cache load fails, return None and rebuild
 
     @classmethod
     def _select_embedder(cls, settings: AppSettings) -> BaseEmbedder:

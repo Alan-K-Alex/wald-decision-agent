@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+from io import BytesIO
 from pathlib import Path
 
 import matplotlib
@@ -45,11 +47,20 @@ class VisualizationEngine:
         ax.set_xlabel("Category")
         ax.grid(True, linestyle="--", alpha=0.25)
         fig.tight_layout()
+        
+        # Save to file
         fig.savefig(filename)
+        
+        # Also generate base64-encoded image for embedding in response
+        buffer = BytesIO()
+        fig.savefig(buffer, format="png")
+        buffer.seek(0)
+        base64_image = base64.b64encode(buffer.read()).decode("utf-8")
         plt.close(fig)
 
         return VisualizationResult(
             path=filename,
             caption=f"{title} chart saved to {filename}.",
             chart_type=chart_type,
+            base64_image=base64_image,
         )

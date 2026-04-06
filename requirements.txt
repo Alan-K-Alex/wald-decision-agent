@@ -12,4 +12,7 @@ xlrd>=2.0.1
 reportlab>=4.2.0
 google-genai>=1.0.0
 openai>=1.35.0
+fastapi>=0.128.0
+uvicorn>=0.39.0
+python-multipart>=0.0.20
 pytest>=8.2.0

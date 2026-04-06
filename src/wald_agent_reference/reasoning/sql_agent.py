@@ -37,6 +37,8 @@ class SQLQueryAgent:
         if not actual_dim or not actual_metric or not target_dim or not target_metric:
             return None
 
+        actual_row_col = actual.columns.get("_source_row")
+        target_row_col = target.columns.get("_source_row")
         direction = "ASC" if any(term in question.lower() for term in ["beat plan", "above plan", "highest positive"]) else "ASC"
         sql = f"""
             SELECT
@@ -44,6 +46,8 @@ class SQLQueryAgent:
                 CAST(a.{actual_metric} AS REAL) AS actual_value,
                 CAST(t.{target_metric} AS REAL) AS target_value,
                 CAST(a.{actual_metric} AS REAL) - CAST(t.{target_metric} AS REAL) AS variance_value
+                {f", a.{actual_row_col} AS actual_source_row" if actual_row_col else ""}
+                {f", t.{target_row_col} AS target_source_row" if target_row_col else ""}
             FROM {actual.sqlite_table} a
             JOIN {target.sqlite_table} t
                 ON LOWER(TRIM(a.{actual_dim})) = LOWER(TRIM(t.{target_dim}))
@@ -59,19 +63,26 @@ class SQLQueryAgent:
             f"{best[0]} has the largest negative variance at {best[3]:,.2f} "
             f"(actual {best[1]:,.2f} vs target {best[2]:,.2f})."
         )
+        actual_row_index = 4 if actual_row_col else None
+        target_row_index = 5 if target_row_col else (4 if target_row_col else None)
         findings = [
-            f"{row[0]}: actual {row[1]:,.2f}, target {row[2]:,.2f}, variance {row[3]:,.2f}"
+            (
+                f"{row[0]}: actual {row[1]:,.2f}, target {row[2]:,.2f}, variance {row[3]:,.2f}"
+                + (f" (source rows actual={int(row[actual_row_index])}, target={int(row[target_row_index])})" if actual_row_col and target_row_col else "")
+            )
             for row in rows
         ]
         trace = [
             f"SQL query executed across {actual.source_file} and {target.source_file}.",
             "Join key matched on normalized entity name.",
             "Variance formula: actual_value - target_value.",
+            f"Actual source: sheet={actual.metadata.get('sheet_name')}, dimension={self._original_column(actual, actual_dim)}, metric={self._original_column(actual, actual_metric)}, range={actual.metadata.get('source_range', 'n/a')}.",
+            f"Target source: sheet={target.metadata.get('sheet_name')}, dimension={self._original_column(target, target_dim)}, metric={self._original_column(target, target_metric)}, range={target.metadata.get('source_range', 'n/a')}.",
             sql.strip(),
         ]
         evidence = [
-            f"{actual.source_file} [{actual.metadata.get('sheet_name') or actual.logical_name}]",
-            f"{target.source_file} [{target.metadata.get('sheet_name') or target.logical_name}]",
+            f"{actual.source_file} [{actual.metadata.get('sheet_name') or actual.logical_name} | row {int(best[actual_row_index]) if actual_row_col else '?'} | columns {self._original_column(actual, actual_dim)}, {self._original_column(actual, actual_metric)}]",
+            f"{target.source_file} [{target.metadata.get('sheet_name') or target.logical_name} | row {int(best[target_row_index]) if target_row_col else '?'} | columns {self._original_column(target, target_dim)}, {self._original_column(target, target_metric)}]",
         ]
         chart_data = {
             "type": "bar",
@@ -145,6 +156,8 @@ class SQLQueryAgent:
         best_col: str | None = None
         best_score = -1
         for original, sqlite_name in entry.columns.items():
+            if original == "_source_row":
+                continue
             tokens = tokenize(original)
             score = sum(1 for keyword in keywords if keyword in original.lower() or keyword in tokens)
             if prefer_numeric and any(word in original.lower() for word in ["score", "revenue", "margin", "cost", "target", "plan", "actual"]):
@@ -167,3 +180,10 @@ class SQLQueryAgent:
         lowered = question.lower()
         metrics = [candidate for candidate in ["revenue", "score", "margin", "cost"] if candidate in lowered]
         return metrics or ["score", "revenue", "margin", "cost"]
+
+    @staticmethod
+    def _original_column(entry: CatalogEntry, sqlite_name: str) -> str:
+        for original, candidate in entry.columns.items():
+            if candidate == sqlite_name:
+                return original
+        return sqlite_name

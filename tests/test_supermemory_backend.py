@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 from pathlib import Path
+from urllib.error import HTTPError
 
 from wald_agent_reference.core.config import AppSettings
 from wald_agent_reference.core.models import Corpus, DocumentChunk, ExtractedDocument
@@ -16,6 +17,11 @@ class DummyResponse(io.BytesIO):
 
     def __exit__(self, exc_type, exc, tb):
         self.close()
+
+
+class DummyHTTPError(HTTPError):
+    def __init__(self, url: str, code: int, msg: str, body: bytes):
+        super().__init__(url, code, msg, hdrs=None, fp=io.BytesIO(body))
 
 
 def test_supermemory_backend_posts_expected_payload(monkeypatch) -> None:
@@ -93,3 +99,41 @@ def test_supermemory_retriever_resolves_chunk_hits() -> None:
 
     assert len(results) == 1
     assert results[0].chunk.chunk_id == "annual:1"
+
+
+def test_supermemory_backend_bulk_delete_uses_container_tag(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_urlopen(request, timeout=30):
+        captured["url"] = request.full_url
+        captured["method"] = request.get_method()
+        captured["body"] = json.loads(request.data.decode("utf-8"))
+        return DummyResponse(b"{}")
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setenv("SUPERMEMORY_API_KEY", "test-key")
+    backend = SupermemoryBackend(AppSettings(memory_backend="supermemory", supermemory_container_tag="chat-123"))
+
+    backend.delete_container()
+
+    assert captured["url"] == "https://api.supermemory.ai/v3/documents/bulk"
+    assert captured["method"] == "DELETE"
+    assert captured["body"]["containerTags"] == ["chat-123"]
+
+
+def test_supermemory_backend_sync_does_not_raise_on_http_400(monkeypatch) -> None:
+    def fake_urlopen(request, timeout=30):
+        raise DummyHTTPError(request.full_url, 400, "Bad Request", b'{"error":"invalid payload"}')
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setenv("SUPERMEMORY_API_KEY", "test-key")
+    backend = SupermemoryBackend(AppSettings(memory_backend="supermemory", supermemory_container_tag="chat-123"))
+    document = ExtractedDocument(
+        document_id="doc-1",
+        source_path=Path("brief.txt"),
+        source_type="text",
+        raw_text="Leadership brief content",
+        metadata={},
+    )
+
+    backend.sync_document(document)
