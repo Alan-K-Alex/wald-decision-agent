@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from wald_agent_reference.core.models import StructuredTable
-from wald_agent_reference.memory.structured_store import StructuredMemoryStore
+from wald_decision_agent.core.models import StructuredTable
+from wald_decision_agent.memory.structured_store import StructuredMemoryStore
 
 
 def test_structured_store_persists_table_and_catalog(tmp_path: Path) -> None:

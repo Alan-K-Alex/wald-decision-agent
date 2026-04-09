@@ -13,9 +13,9 @@ from pathlib import Path
 from PIL import Image
 import io
 
-from wald_agent_reference.ingestion.visual_extractor import VisualExtractor
-from wald_agent_reference.core.config import AppSettings
-from wald_agent_reference.core.models import VisualArtifact
+from wald_decision_agent.ingestion.visual_extractor import VisualExtractor
+from wald_decision_agent.core.config import AppSettings
+from wald_decision_agent.core.models import VisualArtifact
 
 
 @pytest.fixture
@@ -162,7 +162,7 @@ class TestVisualSupermemorySync:
     @pytest.mark.skip(reason="Requires Supermemory API key")
     def test_visual_synced_to_supermemory(self, settings, sample_image_path):
         """Test that visual artifacts are synced to Supermemory"""
-        from wald_agent_reference.memory.memory_backends import SupermemoryBackend
+        from wald_decision_agent.memory.memory_backends import SupermemoryBackend
         
         settings.supermemory_api_key = "test_key"
         settings.supermemory_container_tag = "test_container"
@@ -181,7 +181,7 @@ class TestVisualSupermemorySync:
     
     def test_null_backend_skips_visual_sync(self, settings, sample_image_path):
         """Test that null backend gracefully handles visuals"""
-        from wald_agent_reference.memory.memory_backends import NullMemoryBackend
+        from wald_decision_agent.memory.memory_backends import NullMemoryBackend
         
         backend = NullMemoryBackend()
         
@@ -202,8 +202,8 @@ class TestVisualChartGeneration:
     @pytest.mark.slow
     def test_revenue_chart_generation(self):
         """Test generating revenue visualization"""
-        from wald_agent_reference.rendering.visualize import VisualizationEngine
-        from wald_agent_reference.core.models import CalculationResult
+        from wald_decision_agent.rendering.visualize import VisualizationEngine
+        from wald_decision_agent.core.models import CalculationResult
         
         settings = AppSettings()
         engine = VisualizationEngine(settings)
@@ -233,8 +233,8 @@ class TestVisualChartGeneration:
     @pytest.mark.slow
     def test_variance_chart_generation(self):
         """Test generating variance chart"""
-        from wald_agent_reference.rendering.visualize import VisualizationEngine
-        from wald_agent_reference.core.models import CalculationResult
+        from wald_decision_agent.rendering.visualize import VisualizationEngine
+        from wald_decision_agent.core.models import CalculationResult
         
         settings = AppSettings()
         engine = VisualizationEngine(settings)

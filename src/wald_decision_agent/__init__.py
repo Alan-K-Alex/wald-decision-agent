@@ -1,4 +1,4 @@
-"""Wald Agent Reference."""
+"""Wald Decision Agent."""
 
 from dotenv import load_dotenv
 

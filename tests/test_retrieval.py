@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from wald_agent_reference.core.config import AppSettings
-from wald_agent_reference.ingestion.ingest import DocumentIngestor
-from wald_agent_reference.retrieval.retrieve import HybridRetriever
+from wald_decision_agent.core.config import AppSettings
+from wald_decision_agent.ingestion.ingest import DocumentIngestor
+from wald_decision_agent.retrieval.retrieve import HybridRetriever
 
 
 def test_retrieval_finds_revenue_trend_table() -> None:

@@ -82,7 +82,7 @@ class CalculationEngine:
                 findings=findings,
                 trace=trace,
                 evidence_refs=[
-                    f"{table.source_path.name} [{table.metadata.get('sheet_name', 'Sheet1')} | row {source_row if source_row is not None else '?'} | period {matched_label}]"
+                    f"[{table.source_path.name} [{table.metadata.get('sheet_name', 'Sheet1')} | row {source_row if source_row is not None else '?'} | period {matched_label}]]({table.source_path})"
                 ],
                 chart_data={
                     "type": "line",
@@ -179,8 +179,8 @@ class CalculationEngine:
             }
 
         evidence_ref = (
-            f"{table.source_path.name} "
-            f"[{table.metadata.get('sheet_name', 'Sheet1')} | columns {dimension_col}, {', '.join(metric_columns)}]"
+            f"[{table.source_path.name} "
+            f"[{table.metadata.get('sheet_name', 'Sheet1')} | columns {dimension_col}, {', '.join(metric_columns)}]]({table.source_path})"
         )
         return CalculationResult(
             answer=answer,
@@ -222,7 +222,7 @@ class CalculationEngine:
                 findings=findings,
                 trace=trace,
                 evidence_refs=[
-                    f"{table.source_path.name} [{table.metadata.get('sheet_name', 'Sheet1')} | row {source_row if source_row is not None else '?'} | range {table.metadata.get('source_range', 'n/a')}]"
+                    f"[{table.source_path.name} [{table.metadata.get('sheet_name', 'Sheet1')} | row {source_row if source_row is not None else '?'} | range {table.metadata.get('source_range', 'n/a')}]]({table.source_path})"
                 ],
                 chart_data={"type": "line", "labels": labels, "values": values, "title": f"{target_metric.title()} trend"},
                 numeric_value=growth,
@@ -264,7 +264,7 @@ class CalculationEngine:
                 findings=findings,
                 trace=trace,
                 evidence_refs=[
-                    f"{table.source_path.name} [{table.metadata.get('sheet_name', 'Sheet1')} | row {int(best_row['_source_row']) if '_source_row' in best_row and pd.notna(best_row['_source_row']) else '?'} | metric {metric_col}]"
+                    f"[{table.source_path.name} [{table.metadata.get('sheet_name', 'Sheet1')} | row {int(best_row['_source_row']) if '_source_row' in best_row and pd.notna(best_row['_source_row']) else '?'} | metric {metric_col}]]({table.source_path})"
                 ],
                 chart_data={
                     "type": "bar",
@@ -309,7 +309,7 @@ class CalculationEngine:
                     f"Source workbook/table: {table.source_path.name} / {table.metadata.get('sheet_name', 'Sheet1')}",
                     f"Source range: {table.metadata.get('source_range', 'not available')}",
                 ],
-                evidence_refs=[f"{table.source_path.name} [{table.metadata.get('sheet_name', 'Sheet1')} | column {metric_col}]"],
+                evidence_refs=[f"[{table.source_path.name} [{table.metadata.get('sheet_name', 'Sheet1')} | column {metric_col}]]({table.source_path})"],
                 numeric_value=value,
             )
         return None
@@ -393,7 +393,7 @@ class CalculationEngine:
             answer=answer,
             findings=findings[:5],
             trace=trace,
-            evidence_refs=[f"{best_table.source_path.name} [{best_table.metadata.get('sheet_name', 'Sheet1')}]"],
+            evidence_refs=[f"[{best_table.source_path.name} [{best_table.metadata.get('sheet_name', 'Sheet1')}]]({best_table.source_path})"],
         )
 
     def _explain_metric_method(self, question: str, tables: list[StructuredTable]) -> CalculationResult | None:
@@ -421,11 +421,11 @@ class CalculationEngine:
                 related_columns = " ".join(str(column).lower() for column in related_table.dataframe.columns)
                 if target_metric == "risk" and "severity" in related_columns:
                     supporting_refs.append(
-                        f"{related_table.source_path.name} [{related_table.metadata.get('sheet_name', 'Sheet1')} | qualitative risk fields]"
+                        f"[{related_table.source_path.name} [{related_table.metadata.get('sheet_name', 'Sheet1')} | qualitative risk fields]]({related_table.source_path})"
                     )
 
             evidence_refs = [
-                f"{table.source_path.name} [{table.metadata.get('sheet_name', 'Sheet1')} | column {metric_col}]"
+                f"[{table.source_path.name} [{table.metadata.get('sheet_name', 'Sheet1')} | column {metric_col}]]({table.source_path})"
             ]
             for ref in supporting_refs:
                 if ref not in evidence_refs:

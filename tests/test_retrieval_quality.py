@@ -5,8 +5,8 @@ Tests to verify that document-based answers are retrieved correctly and efficien
 
 import pytest
 from pathlib import Path
-from wald_agent_reference.core.agent import LeadershipInsightAgent
-from wald_agent_reference.core.config import AppSettings
+from wald_decision_agent.core.agent import LeadershipInsightAgent
+from wald_decision_agent.core.config import AppSettings
 
 
 @pytest.fixture

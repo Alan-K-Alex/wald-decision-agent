@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "wald-agent-reference"
+name = "wald-decision-agent"
 version = "0.1.0"
 description = "Leadership insight agent for enterprise document QA with spreadsheet-aware calculations."
 readme = "README.md"

@@ -6,8 +6,8 @@ from docx import Document
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import Image, SimpleDocTemplate
 
-from wald_agent_reference.core.config import AppSettings
-from wald_agent_reference.ingestion.ingest import DocumentIngestor
+from wald_decision_agent.core.config import AppSettings
+from wald_decision_agent.ingestion.ingest import DocumentIngestor
 
 
 def test_ingestion_supports_docx_and_csv(tmp_path: Path) -> None:

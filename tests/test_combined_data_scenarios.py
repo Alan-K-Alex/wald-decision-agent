@@ -10,9 +10,9 @@ Tests:
 
 import pytest
 from pathlib import Path
-from wald_agent_reference.core.agent import LeadershipInsightAgent
-from wald_agent_reference.chat.manager import ChatManager, _generate_title_from_question
-from wald_agent_reference.core.config import AppSettings
+from wald_decision_agent.core.agent import LeadershipInsightAgent
+from wald_decision_agent.chat.manager import ChatManager, _generate_title_from_question
+from wald_decision_agent.core.config import AppSettings
 
 
 @pytest.fixture
@@ -244,7 +244,7 @@ class TestDynamicTitleGeneration:
     @pytest.mark.slow
     def test_chat_title_updates_dynamically(self):
         """Verify that chat manager updates title dynamically from first question"""
-        from wald_agent_reference.chat.manager import ChatManager
+        from wald_decision_agent.chat.manager import ChatManager
         
         settings = AppSettings(
             data_sources_path=str(Path("data/raw")),
@@ -266,7 +266,7 @@ class TestDynamicTitleGeneration:
         expected_title = _generate_title_from_question(question)
         
         # Create a simple mock response
-        from wald_agent_reference.core.models import AgentResponse
+        from wald_decision_agent.core.models import AgentResponse
         response = AgentResponse(
             question=question,
             planned_approach=["Test plan"],

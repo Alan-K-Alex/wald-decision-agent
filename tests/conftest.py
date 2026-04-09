@@ -26,7 +26,7 @@ def pytest_configure(config):
 @pytest.fixture
 def client():
     """Provide FastAPI TestClient for endpoint testing"""
-    from wald_agent_reference.web.app import create_app
+    from wald_decision_agent.web.app import create_app
     
     app = create_app()
     return TestClient(app)

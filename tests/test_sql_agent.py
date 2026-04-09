@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from wald_agent_reference.core.models import StructuredTable
-from wald_agent_reference.memory.structured_store import StructuredMemoryStore
-from wald_agent_reference.reasoning.sql_agent import SQLQueryAgent
+from wald_decision_agent.core.models import StructuredTable
+from wald_decision_agent.memory.structured_store import StructuredMemoryStore
+from wald_decision_agent.reasoning.sql_agent import SQLQueryAgent
 
 
 def test_sql_agent_joins_actuals_and_targets_for_variance(tmp_path: Path) -> None:

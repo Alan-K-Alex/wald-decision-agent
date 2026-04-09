@@ -1,6 +1,6 @@
 """Test that planner correctly prioritizes document retrieval when explicitly requested."""
 
-from wald_agent_reference.reasoning.planner import PlannerAgent
+from wald_decision_agent.reasoning.planner import PlannerAgent
 
 
 def test_planner_respects_explicit_document_request_over_sql_keywords() -> None:

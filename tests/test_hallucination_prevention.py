@@ -12,8 +12,8 @@ Tests verifying the agent:
 
 import pytest
 from pathlib import Path
-from wald_agent_reference.core.agent import LeadershipInsightAgent
-from wald_agent_reference.core.config import AppSettings
+from wald_decision_agent.core.agent import LeadershipInsightAgent
+from wald_decision_agent.core.config import AppSettings
 
 
 @pytest.fixture

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from wald_agent_reference import LeadershipInsightAgent
-from wald_agent_reference.core.config import AppSettings
+from wald_decision_agent import LeadershipInsightAgent
+from wald_decision_agent.core.config import AppSettings
 
 
 def test_agent_answers_cross_table_variance_question(tmp_path: Path) -> None:

@@ -66,7 +66,7 @@ class VisualReasoner:
                     f"Visual extraction backend: {visual.metadata.get('extraction_backend', 'unknown')}",
                     f"Source visual: {visual.source_path.name}",
                 ],
-                evidence_refs=[visual.source_path.name],
+                evidence_refs=[f"[{visual.source_path.name}]({visual.source_path})"],
                 chart_data={"type": "line", "labels": quarters, "values": values, "title": visual.metadata.get("title", visual.source_path.stem)},
                 numeric_value=values[-1],
             )
@@ -78,7 +78,7 @@ class VisualReasoner:
                 f"Visual extraction backend: {visual.metadata.get('extraction_backend', 'unknown')}",
                 f"Source visual: {visual.source_path.name}",
             ],
-            evidence_refs=[visual.source_path.name],
+            evidence_refs=[f"[{visual.source_path.name}]({visual.source_path})"],
         )
 
     def _is_grounded_visual_match(self, question: str, visual: VisualArtifact) -> bool:

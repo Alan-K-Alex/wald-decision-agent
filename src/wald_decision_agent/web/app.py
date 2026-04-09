@@ -24,7 +24,7 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
     settings_factory = ChatSettingsFactory(app_settings)
     context_resolver = ConversationContextResolver()
 
-    app = FastAPI(title="Wald Agent Reference")
+    app = FastAPI(title="Wald Decision Agent")
     app.mount("/artifacts", StaticFiles(directory=app_settings.chats_path, check_dir=False), name="artifacts")
 
     @app.get("/", response_class=HTMLResponse)
@@ -130,11 +130,14 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
         # Reload session to get updated title
         chat_response = response.to_chat_response()
         plot_urls = [f"/artifacts/{chat_id}/artifacts/plots/{Path(path).name}" for path in response.plot_paths]
-        formatted_evidence = _format_inline_references(chat_response.evidence, chat_id, session.docs_dir)
+        plots_dir = session.artifacts_dir / "plots"
+        formatted_evidence = _format_inline_references(chat_response.evidence, chat_id, session.docs_dir, plots_dir)
+        formatted_refs = _format_source_references(chat_response.source_references, chat_id, session.docs_dir, plots_dir)
         chat_markdown = _build_chat_markdown(
             answer=chat_response.answer,
             key_findings=chat_response.key_findings,
             evidence=formatted_evidence,
+            source_references=formatted_refs,
             plot_urls=plot_urls,
         )
         chat_manager.record_exchange(
@@ -142,6 +145,7 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
             question,
             response,
             evidence=formatted_evidence,
+            source_references=formatted_refs,
             plot_urls=plot_urls,
             markdown=chat_markdown,
         )
@@ -156,6 +160,7 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
             "answer": chat_response.answer,
             "key_findings": chat_response.key_findings,
             "evidence": formatted_evidence,
+            "source_references": formatted_refs,
             "visual_insights": chat_response.visual_insights,
             "plot_urls": plot_urls,
             "plot_base64": chat_response.plots_base64[0] if chat_response.plots_base64 else "",
@@ -197,11 +202,14 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
         response = agent.ask(question=resolved.question, docs_path=session.docs_dir, generate_plot=generate_plot)
         plot_urls = [f"/artifacts/{chat_id}/artifacts/plots/{Path(path).name}" for path in response.plot_paths]
         chat_response = response.to_chat_response()
-        formatted_evidence = _format_inline_references(chat_response.evidence, chat_id, session.docs_dir)
+        plots_dir = session.artifacts_dir / "plots"
+        formatted_evidence = _format_inline_references(chat_response.evidence, chat_id, session.docs_dir, plots_dir)
+        formatted_refs = _format_source_references(chat_response.source_references, chat_id, session.docs_dir, plots_dir)
         chat_markdown = _build_chat_markdown(
             answer=chat_response.answer,
             key_findings=chat_response.key_findings,
             evidence=formatted_evidence,
+            source_references=formatted_refs,
             plot_urls=plot_urls,
         )
         chat_manager.record_exchange(
@@ -209,6 +217,7 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
             question,
             response,
             evidence=formatted_evidence,
+            source_references=formatted_refs,
             plot_urls=plot_urls,
             markdown=chat_markdown,
         )
@@ -221,6 +230,7 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
         response_dict = chat_response.to_dict()
         response_dict["title"] = updated_session.title  # Add the updated title
         response_dict["evidence"] = formatted_evidence
+        response_dict["source_references"] = formatted_refs
         response_dict["plot_urls"] = plot_urls
         response_dict["markdown"] = chat_markdown
         
@@ -326,11 +336,14 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
     return app
 
 
-def _format_source_references(references: list[str], chat_id: str, docs_dir: Path) -> list[str]:
-    """Convert relative file paths in references to clickable artifact URLs."""
+def _format_source_references(references: list[str], chat_id: str, docs_dir: Path, plots_dir: Path | None = None) -> list[str]:
+    """Rewrite markdown links in source references to chat-scoped artifact URLs."""
     import re
     
     formatted = []
+    abs_docs_dir = docs_dir.resolve()
+    abs_plots_dir = plots_dir.resolve() if plots_dir else None
+
     for ref in references:
         # Parse markdown link format: [display text](path)
         match = re.match(r'\[(.+)\]\(([^)]+)\)', ref)
@@ -340,49 +353,101 @@ def _format_source_references(references: list[str], chat_id: str, docs_dir: Pat
             
             # Try to resolve the file path
             try:
-                resolved = docs_dir / file_path
-                if resolved.exists() and resolved.is_file():
-                    # Create artifact URL
-                    artifact_url = f"/artifacts/{chat_id}/docs/{file_path}"
+                # Always resolve to absolute for reliable comparison
+                p = Path(file_path)
+                if not p.is_absolute():
+                    # Check docs_dir, then plots_dir
+                    resolved = abs_docs_dir / file_path
+                    if resolved.exists():
+                        p = resolved
+                    elif abs_plots_dir:
+                        resolved = abs_plots_dir / file_path
+                        if resolved.exists():
+                            p = resolved
+                        else:
+                            p = p.resolve()
+                    else:
+                        p = p.resolve()
+                else:
+                    p = p.resolve()
+
+                if p.is_relative_to(abs_docs_dir):
+                    resolved_path = p.relative_to(abs_docs_dir)
+                    artifact_url = f"/artifacts/{chat_id}/docs/{resolved_path}"
+                    formatted.append(f"[{display_text}]({artifact_url})")
+                elif abs_plots_dir and p.is_relative_to(abs_plots_dir):
+                    resolved_path = p.relative_to(abs_plots_dir)
+                    artifact_url = f"/artifacts/{chat_id}/artifacts/plots/{resolved_path}"
                     formatted.append(f"[{display_text}]({artifact_url})")
                 else:
-                    # Keep original if file not found
+                    # Keep as-is if it doesn't resolve into known directories
                     formatted.append(ref)
             except Exception:
-                # Keep original if there's any error
                 formatted.append(ref)
         else:
-            # Not a markdown link, keep as is
             formatted.append(ref)
     
     return formatted
 
 
-def _format_inline_references(items: list[str], chat_id: str, docs_dir: Path) -> list[str]:
+def _format_inline_references(items: list[str], chat_id: str, docs_dir: Path, plots_dir: Path | None = None) -> list[str]:
     """Rewrite markdown links inside evidence lines to chat-scoped artifact URLs."""
     import re
 
     pattern = re.compile(r"\[(.+)\]\(([^)]+)\)")
-    formatted_items: list[str] = []
-    for item in items:
-        def replace(match: re.Match[str]) -> str:
-            label = match.group(1)
-            file_path = match.group(2)
-            resolved = docs_dir / file_path
-            if resolved.exists() and resolved.is_file():
-                return f"[{label}](/artifacts/{chat_id}/docs/{file_path})"
+
+    abs_docs_dir = docs_dir.resolve()
+    abs_plots_dir = plots_dir.resolve() if plots_dir else None
+
+    def replacer(match):
+        label = match.group(1)
+        path_str = match.group(2)
+        try:
+            p = Path(path_str)
+            if not p.is_absolute():
+                # Check docs_dir, then plots_dir
+                resolved = abs_docs_dir / path_str
+                if resolved.exists():
+                    p = resolved
+                elif abs_plots_dir:
+                    resolved = abs_plots_dir / path_str
+                    if resolved.exists():
+                        p = resolved
+                    else:
+                        p = p.resolve()
+                else:
+                    p = p.resolve()
+            else:
+                p = p.resolve()
+                
+            if p.is_relative_to(abs_docs_dir):
+                rel = p.relative_to(abs_docs_dir)
+                return f"[{label}](/artifacts/{chat_id}/docs/{rel})"
+            elif abs_plots_dir and p.is_relative_to(abs_plots_dir):
+                rel = p.relative_to(abs_plots_dir)
+                return f"[{label}](/artifacts/{chat_id}/artifacts/plots/{rel})"
+            return match.group(0)
+        except Exception:
             return match.group(0)
 
-        formatted_items.append(pattern.sub(replace, item))
+    formatted_items = []
+    for item in items:
+        # Replace matches using the replacer function
+        formatted_item = pattern.sub(replacer, item)
+        formatted_items.append(formatted_item)
+    
     return formatted_items
 
 
-def _build_chat_markdown(answer: str, key_findings: list[str], evidence: list[str], plot_urls: list[str]) -> str:
+def _build_chat_markdown(answer: str, key_findings: list[str], evidence: list[str], source_references: list[str], plot_urls: list[str]) -> str:
     sections = [
         ("Executive Summary", answer),
         ("Key Findings", "\n".join(f"{idx}. {item}" for idx, item in enumerate(key_findings, start=1)) or "1. No findings generated."),
         ("Evidence", "\n".join(f"- {item}" for item in evidence) or "- No evidence retrieved."),
     ]
+    if source_references:
+        sections.append(("Source References", "\n".join(f"- {item}" for item in source_references)))
+    
     if plot_urls:
         sections.append(("Plots", "\n".join(f"![plot]({url})" for url in plot_urls)))
     return "\n\n".join(f"{title}\n{body}" for title, body in sections)
@@ -717,7 +782,7 @@ def _index_html() -> str:
 
     function renderInlineMarkdown(text) {
       const escaped = escapeHtml(text);
-      return escaped.replace(/\[(.+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+      return escaped.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
     }
 
     function appendAssistantSection(container, title, items, ordered=false) {
@@ -822,6 +887,7 @@ def _index_html() -> str:
       appendAssistantSection(body, 'Executive Summary', message.answer || message.content || '');
       appendAssistantSection(body, 'Key Findings', message.key_findings || [], true);
       appendAssistantSection(body, 'Evidence', message.evidence || []);
+      appendAssistantSection(body, 'Source References', message.source_references || []);
 
       const plotUrls = message.plot_urls || [];
       const hasEmbeddedPlot = message.plot_base64 && message.plot_base64.length > 0;

@@ -6,7 +6,7 @@ from pathlib import Path
 from .config import AppSettings
 
 
-LOGGER_NAME = "wald_agent_reference"
+LOGGER_NAME = "wald_decision_agent"
 
 
 def configure_logging(settings: AppSettings) -> logging.Logger:

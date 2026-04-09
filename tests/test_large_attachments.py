@@ -15,9 +15,9 @@ import tempfile
 import io
 import time
 
-from wald_agent_reference.ingestion.ingest import DocumentIngestor
-from wald_agent_reference.core.config import AppSettings
-from wald_agent_reference.memory.memory_backends import SupermemoryBackend
+from wald_decision_agent.ingestion.ingest import DocumentIngestor
+from wald_decision_agent.core.config import AppSettings
+from wald_decision_agent.memory.memory_backends import SupermemoryBackend
 
 
 class TestLargePDFIngestion:
@@ -118,7 +118,7 @@ class TestLargeCSVHandling:
     @pytest.mark.performance
     def test_large_csv_parsing_time(self, large_csv_path):
         """Test CSV parsing performance"""
-        from wald_agent_reference.ingestion.spreadsheet_parser import SpreadsheetParser
+        from wald_decision_agent.ingestion.spreadsheet_parser import SpreadsheetParser
         
         parser = SpreadsheetParser()
         
@@ -133,7 +133,7 @@ class TestLargeCSVHandling:
     @pytest.mark.slow
     def test_large_csv_row_count(self, large_csv_path):
         """Test that all rows from large CSV are captured"""
-        from wald_agent_reference.ingestion.spreadsheet_parser import SpreadsheetParser
+        from wald_decision_agent.ingestion.spreadsheet_parser import SpreadsheetParser
         
         parser = SpreadsheetParser()
         tables = parser.parse_file(large_csv_path)
@@ -147,7 +147,7 @@ class TestLargeCSVHandling:
     @pytest.mark.slow
     def test_large_csv_structured_store_sync(self):
         """Test syncing large CSV to SQLite structured store"""
-        from wald_agent_reference.memory.structured_store import StructuredMemoryStore
+        from wald_decision_agent.memory.structured_store import StructuredMemoryStore
         
         # This tests that large tables can be queried without timeouts
         # Real implementation would test actual ingestion
@@ -176,7 +176,7 @@ class TestLargeBatchVisualExtraction:
     @pytest.mark.performance
     def test_batch_image_extraction_time(self, image_batch):
         """Test extracting 50 images completes in reasonable time"""
-        from wald_agent_reference.ingestion.visual_extractor import VisualExtractor
+        from wald_decision_agent.ingestion.visual_extractor import VisualExtractor
         
         settings = AppSettings()
         extractor = VisualExtractor(settings)
@@ -198,7 +198,7 @@ class TestLargeBatchVisualExtraction:
     @pytest.mark.slow
     def test_batch_visual_uniqueness(self, image_batch):
         """Test that all visuals get unique IDs"""
-        from wald_agent_reference.ingestion.visual_extractor import VisualExtractor
+        from wald_decision_agent.ingestion.visual_extractor import VisualExtractor
         
         settings = AppSettings()
         extractor = VisualExtractor(settings)
@@ -220,7 +220,7 @@ class TestSupermemoryPayloadHandling:
     @pytest.mark.skip(reason="Requires Supermemory API")
     def test_large_document_sync(self):
         """Test syncing large document to Supermemory"""
-        from wald_agent_reference.core.models import ExtractedDocument
+        from wald_decision_agent.core.models import ExtractedDocument
         
         # Create large document (5MB text)
         large_text = "Sample text. " * 400000  # ~5MB
@@ -243,7 +243,7 @@ class TestSupermemoryPayloadHandling:
     
     def test_supermemory_payload_sanitization(self):
         """Test that large payloads are properly sanitized"""
-        from wald_agent_reference.memory.memory_backends import SupermemoryBackend
+        from wald_decision_agent.memory.memory_backends import SupermemoryBackend
         
         settings = AppSettings()
         backend = SupermemoryBackend(settings)

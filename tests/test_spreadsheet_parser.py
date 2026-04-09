@@ -4,7 +4,7 @@ from pathlib import Path
 
 from openpyxl import Workbook
 
-from wald_agent_reference.ingestion.spreadsheet_parser import SpreadsheetParser
+from wald_decision_agent.ingestion.spreadsheet_parser import SpreadsheetParser
 
 
 def test_spreadsheet_parser_preserves_sheet_and_headers(tmp_path: Path) -> None:

@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from wald_agent_reference.core.models import StructuredTable
-from wald_agent_reference.reasoning.calculator import CalculationEngine
+from wald_decision_agent.core.models import StructuredTable
+from wald_decision_agent.reasoning.calculator import CalculationEngine
 
 
 def test_calculator_computes_trend_growth() -> None:

@@ -98,6 +98,7 @@ class ChatResponse:
     plots_base64: list[str] = field(default_factory=list)
     plot_paths: list[str] = field(default_factory=list)
     source_summary: str = ""
+    source_references: list[str] = field(default_factory=list)
     data_types_used: list[str] = field(default_factory=list)
     
     def to_dict(self) -> dict:
@@ -111,6 +112,7 @@ class ChatResponse:
             "plots_base64": self.plots_base64,
             "plot_paths": [str(p) for p in self.plot_paths],
             "source_summary": self.source_summary,
+            "source_references": self.source_references,
             "data_types_used": self.data_types_used,
         }
 
@@ -156,6 +158,7 @@ class AgentResponse:
             ("Executive Summary", self.executive_summary),
             ("Key Findings", "\n".join(f"{idx}. {item}" for idx, item in enumerate(self.key_findings, start=1)) or "1. No findings generated."),
             ("Evidence", "\n".join(f"- {item}" for item in self.evidence) or "- No evidence retrieved."),
+            ("Source References", "\n".join(f"- {item}" for item in self.source_references) or "- No references recorded."),
         ]
 
         rendered_plot_urls = plot_urls or [str(path.resolve()) for path in self.plot_paths]
@@ -193,5 +196,6 @@ class AgentResponse:
             plots_base64=[self.plot_base64] if self.plot_base64 else [],
             plot_paths=plot_paths_str,
             source_summary=f"Referenced {len(self.source_references)} sources",
+            source_references=self.source_references,
             data_types_used=list(data_types),
         )

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from wald_agent_reference.reasoning.planner import PlannerAgent
+from wald_decision_agent.reasoning.planner import PlannerAgent
 
 
 def test_planner_routes_variance_queries_to_sql() -> None:

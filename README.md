@@ -1,6 +1,6 @@
-# Wald Agent Reference
+# Wald Decision Agent
 
-Wald Agent Reference is a grounded document intelligence system for enterprise files. It ingests business documents, preserves structured tables, answers questions with source-backed evidence, performs deterministic calculations for numeric queries, and generates plots when the data supports them.
+Wald Decision Agent is a grounded document intelligence system for enterprise files. It ingests business documents, preserves structured tables, answers questions with source-backed evidence, performs deterministic calculations for numeric queries, and generates plots when the data supports them.
 
 ## Overview
 
@@ -36,7 +36,7 @@ It combines:
 
 - Python `3.9+`
 - `pip`
-- optional API keys:
+- API keys:
   - `GROQ_API_KEY` (Primary for answer formatting)
   - `GEMINI_API_KEY` (For vision extraction and embeddings)
 
@@ -65,19 +65,18 @@ GROQ_API_KEY=your_key_here
 GEMINI_API_KEY=your_key_here
 ```
 
-The project runs locally without keys using fallback behavior for formatting.
 
 ## Run The Web App
 
 ### macOS / Linux
 ```bash
-PYTHONPATH=src python -m wald_agent_reference.main serve --host 0.0.0.0 --port 8000
+PYTHONPATH=src python -m wald_decision_agent.main serve --host 0.0.0.0 --port 8000
 ```
 
 ### Windows
 ```bash
 set PYTHONPATH=src
-python -m wald_agent_reference.main serve --host 0.0.0.0 --port 8000
+python -m wald_decision_agent.main serve --host 0.0.0.0 --port 8000
 ```
 
 Then open [http://localhost:8000](http://localhost:8000).
@@ -93,7 +92,7 @@ To see the system in action:
 ## Run From The CLI
 
 ```bash
-PYTHONPATH=src python -m wald_agent_reference.main ask --docs data/raw --question "What is our current revenue trend?" --plot
+PYTHONPATH=src python -m wald_decision_agent.main ask --docs data/raw --question "What is our current revenue trend?" --plot
 ```
 
 ## Repository Layout
@@ -102,7 +101,7 @@ PYTHONPATH=src python -m wald_agent_reference.main ask --docs data/raw --questio
 config/settings.yaml
 data/raw/               # Sample document folder for testing
 data/sample_questions/  # Sample questions to try
-src/wald_agent_reference/
+src/wald_decision_agent/
   core/
   ingestion/
   retrieval/

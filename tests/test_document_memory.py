@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from wald_agent_reference.core.config import AppSettings
-from wald_agent_reference.ingestion.ingest import DocumentIngestor
-from wald_agent_reference.memory.structured_store import StructuredMemoryStore
+from wald_decision_agent.core.config import AppSettings
+from wald_decision_agent.ingestion.ingest import DocumentIngestor
+from wald_decision_agent.memory.structured_store import StructuredMemoryStore
 
 
 def test_long_document_is_chunked_with_offsets_and_persisted(tmp_path: Path) -> None:

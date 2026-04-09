@@ -5,10 +5,10 @@ import json
 from pathlib import Path
 from urllib.error import HTTPError
 
-from wald_agent_reference.core.config import AppSettings
-from wald_agent_reference.core.models import Corpus, DocumentChunk, ExtractedDocument
-from wald_agent_reference.memory.memory_backends import SupermemoryBackend
-from wald_agent_reference.retrieval.supermemory_retrieve import SupermemoryRetriever
+from wald_decision_agent.core.config import AppSettings
+from wald_decision_agent.core.models import Corpus, DocumentChunk, ExtractedDocument
+from wald_decision_agent.memory.memory_backends import SupermemoryBackend
+from wald_decision_agent.retrieval.supermemory_retrieve import SupermemoryRetriever
 
 
 class DummyResponse(io.BytesIO):

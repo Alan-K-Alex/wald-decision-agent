@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from wald_agent_reference.core.config import AppSettings
-from wald_agent_reference.core.models import AgentResponse, CalculationResult, DocumentChunk, QueryPlan, RetrievedChunk
-from wald_agent_reference.reasoning.answer import AnswerComposer
+from wald_decision_agent.core.config import AppSettings
+from wald_decision_agent.core.models import AgentResponse, CalculationResult, DocumentChunk, QueryPlan, RetrievedChunk
+from wald_decision_agent.reasoning.answer import AnswerComposer
 
 
 def test_answer_format_contains_required_sections() -> None:

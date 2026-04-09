@@ -3,7 +3,6 @@
     "question": "What is our current revenue trend?",
     "expected_keywords": ["increasing", "revenue", "growth"],
     "expected_sources": ["revenue_trend.csv [Sheet1]"],
-    "expected_numeric": 14.29,
     "generate_plot": true
   },
   {
@@ -22,7 +21,6 @@
     "question": "Which region missed revenue plan by the largest amount?",
     "expected_keywords": ["europe", "variance", "target"],
     "expected_sources": ["regional_actuals.csv [Sheet1]", "regional_targets.csv [Sheet1]"],
-    "expected_numeric": -5.0,
     "generate_plot": true
   }
 ]

@@ -4,9 +4,9 @@ Test to inspect what chunks are actually being retrieved
 
 import pytest
 from pathlib import Path
-from wald_agent_reference.core.agent import LeadershipInsightAgent
-from wald_agent_reference.core.config import AppSettings
-from wald_agent_reference.retrieval.retrieve import HybridRetriever
+from wald_decision_agent.core.agent import LeadershipInsightAgent
+from wald_decision_agent.core.config import AppSettings
+from wald_decision_agent.retrieval.retrieve import HybridRetriever
 
 
 @pytest.fixture
@@ -23,7 +23,7 @@ class TestRetrievalInspection:
         question = "What improvements did engineering make?"
         
         # Simulate ingestion
-        from wald_agent_reference.ingestion.ingest import ingest_folder
+        from wald_decision_agent.ingestion.ingest import ingest_folder
         corpus = ingest_folder(Path("data/raw"))
         
         # Create retriever
@@ -57,7 +57,7 @@ class TestRetrievalInspection:
         """See what chunks are retrieved for risks question"""
         question = "What are the largest risks?"
         
-        from wald_agent_reference.ingestion.ingest import ingest_folder
+        from wald_decision_agent.ingestion.ingest import ingest_folder
         corpus = ingest_folder(Path("data/raw"))
         
         retriever = HybridRetriever(corpus)

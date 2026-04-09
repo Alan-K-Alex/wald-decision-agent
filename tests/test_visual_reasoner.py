@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from wald_agent_reference.core.models import VisualArtifact
-from wald_agent_reference.reasoning.visual_reasoner import VisualReasoner
+from wald_decision_agent.core.models import VisualArtifact
+from wald_decision_agent.reasoning.visual_reasoner import VisualReasoner
 
 
 def test_visual_reasoner_detects_quarterly_trend() -> None:

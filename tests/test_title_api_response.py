@@ -3,8 +3,8 @@
 import pytest
 from pathlib import Path
 import json
-from wald_agent_reference.chat.manager import ChatManager, _generate_title_from_question
-from wald_agent_reference.core.config import AppSettings
+from wald_decision_agent.chat.manager import ChatManager, _generate_title_from_question
+from wald_decision_agent.core.config import AppSettings
 
 
 @pytest.fixture
@@ -35,7 +35,7 @@ def test_title_updated_in_chat_metadata(chat_manager_fixture):
     print(f"\n✓ Initial title in metadata: {initial_data['title']}")
     
     # Simulate recording an exchange with a real question
-    from wald_agent_reference.core.models import AgentResponse
+    from wald_decision_agent.core.models import AgentResponse
     
     question = "What are the key risks highlighted by leadership?"
     expected_title = _generate_title_from_question(question)
@@ -86,7 +86,7 @@ def test_api_response_includes_updated_title(chat_manager_fixture):
     expected_title = _generate_title_from_question(question)
     
     # Create mock response
-    from wald_agent_reference.core.models import AgentResponse
+    from wald_decision_agent.core.models import AgentResponse
     response = AgentResponse(
         question=question,
         planned_approach=["Route: SQL"],

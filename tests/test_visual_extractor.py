@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from wald_agent_reference.core.config import AppSettings
-from wald_agent_reference.ingestion.visual_extractor import VisualExtractor
+from wald_decision_agent.core.config import AppSettings
+from wald_decision_agent.ingestion.visual_extractor import VisualExtractor
 
 
 def test_visual_extractor_reads_svg_text() -> None:

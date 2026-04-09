@@ -1,4 +1,4 @@
-app_name: wald-agent-reference
+app_name: wald-decision-agent
 chunk_size: 900
 chunk_overlap: 150
 top_k: 5
@@ -15,7 +15,7 @@ retrieval_backend: auto
 vector_store_dir: outputs/vector_store
 structured_store_path: outputs/structured_memory.db
 memory_backend: supermemory
-supermemory_container_tag: wald-agent-reference
+supermemory_container_tag: wald-decision-agent
 supermemory_search_mode: hybrid
 log_level: INFO
 log_file: outputs/logs/agent.log

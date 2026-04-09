@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from wald_agent_reference import LeadershipInsightAgent
-from wald_agent_reference.core.config import AppSettings
-from wald_agent_reference.ingestion.ingest import DocumentIngestor
+from wald_decision_agent import LeadershipInsightAgent
+from wald_decision_agent.core.config import AppSettings
+from wald_decision_agent.ingestion.ingest import DocumentIngestor
 
 
 def _settings(tmp_path: Path) -> AppSettings:

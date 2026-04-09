@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from wald_agent_reference.reasoning.conversation import ConversationContextResolver
+from wald_decision_agent.reasoning.conversation import ConversationContextResolver
 
 
 def test_follow_up_question_is_rewritten_using_previous_topic() -> None:

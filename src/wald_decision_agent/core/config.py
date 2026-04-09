@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 
 class AppSettings(BaseModel):
-    app_name: str = "wald-agent-reference"
+    app_name: str = "wald-decision-agent"
     chunk_size: int = 900
     chunk_overlap: int = 150
     top_k: int = 5
@@ -27,7 +27,7 @@ class AppSettings(BaseModel):
     vector_store_dir: str = "outputs/vector_store"
     structured_store_path: str = "outputs/structured_memory.db"
     memory_backend: str = "supermemory"
-    supermemory_container_tag: str = "wald-agent-reference"
+    supermemory_container_tag: str = "wald-decision-agent"
     supermemory_search_mode: str = "hybrid"
     log_level: str = "INFO"
     log_file: str = "outputs/logs/agent.log"
@@ -102,8 +102,14 @@ def load_settings(path: str | Path = "config/settings.yaml") -> AppSettings:
     load_dotenv()
     config_path = Path(path)
     if not config_path.exists():
-        return AppSettings()
-
-    with config_path.open("r", encoding="utf-8") as handle:
-        raw: dict[str, Any] = yaml.safe_load(handle) or {}
-    return AppSettings(**raw)
+        settings = AppSettings()
+    else:
+        with config_path.open("r", encoding="utf-8") as handle:
+            raw: dict[str, Any] = yaml.safe_load(handle) or {}
+        settings = AppSettings(**raw)
+    
+    # Ensure base directories exist
+    settings.output_path.mkdir(parents=True, exist_ok=True)
+    settings.chats_path.mkdir(parents=True, exist_ok=True)
+    
+    return settings

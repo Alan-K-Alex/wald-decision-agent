@@ -81,8 +81,8 @@ class SQLQueryAgent:
             sql.strip(),
         ]
         evidence = [
-            f"{actual.source_file} [{actual.metadata.get('sheet_name') or actual.logical_name} | row {int(best[actual_row_index]) if actual_row_col else '?'} | columns {self._original_column(actual, actual_dim)}, {self._original_column(actual, actual_metric)}]",
-            f"{target.source_file} [{target.metadata.get('sheet_name') or target.logical_name} | row {int(best[target_row_index]) if target_row_col else '?'} | columns {self._original_column(target, target_dim)}, {self._original_column(target, target_metric)}]",
+            f"[{actual.source_file} [{actual.metadata.get('sheet_name') or actual.logical_name} | row {int(best[actual_row_index]) if actual_row_col else '?'} | columns {self._original_column(actual, actual_dim)}, {self._original_column(actual, actual_metric)}]]({actual.source_file})",
+            f"[{target.source_file} [{target.metadata.get('sheet_name') or target.logical_name} | row {int(best[target_row_index]) if target_row_col else '?'} | columns {self._original_column(target, target_dim)}, {self._original_column(target, target_metric)}]]({target.source_file})",
         ]
         chart_data = {
             "type": "bar",
@@ -130,7 +130,7 @@ class SQLQueryAgent:
             answer=answer,
             findings=findings,
             trace=trace,
-            evidence_refs=[f"{risk_table.source_file} [{risk_table.metadata.get('sheet_name') or risk_table.logical_name}]"],
+            evidence_refs=[f"[{risk_table.source_file} [{risk_table.metadata.get('sheet_name') or risk_table.logical_name}]]({risk_table.source_file})"],
             chart_data={"type": "bar", "labels": [row[0] for row in rows], "values": [float(row[1]) for row in rows], "title": "Open high risks by owner"},
             numeric_value=float(rows[0][1]),
         )

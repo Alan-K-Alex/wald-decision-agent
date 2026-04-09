@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from wald_agent_reference import LeadershipInsightAgent
-from wald_agent_reference.core.config import AppSettings
-from wald_agent_reference.memory.memory_backends import MemoryBackend
+from wald_decision_agent import LeadershipInsightAgent
+from wald_decision_agent.core.config import AppSettings
+from wald_decision_agent.memory.memory_backends import MemoryBackend
 
 
 def test_agent_abstains_when_evidence_is_missing(tmp_path: Path) -> None:
@@ -97,7 +97,7 @@ def test_agent_can_use_supermemory_for_narrative_retrieval(monkeypatch, tmp_path
                 }
             ]
 
-    monkeypatch.setattr("wald_agent_reference.core.tools.build_memory_backend", lambda settings: StubMemoryBackend())
+    monkeypatch.setattr("wald_decision_agent.core.tools.build_memory_backend", lambda settings: StubMemoryBackend())
 
     root = Path(__file__).resolve().parents[1]
     settings = AppSettings(
@@ -143,7 +143,7 @@ def test_agent_combines_supermemory_evidence_with_sql_answer(monkeypatch, tmp_pa
                 }
             ]
 
-    monkeypatch.setattr("wald_agent_reference.core.tools.build_memory_backend", lambda settings: StubMemoryBackend())
+    monkeypatch.setattr("wald_decision_agent.core.tools.build_memory_backend", lambda settings: StubMemoryBackend())
 
     root = Path(__file__).resolve().parents[1]
     settings = AppSettings(

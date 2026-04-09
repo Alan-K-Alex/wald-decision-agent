@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from wald_agent_reference.core.config import AppSettings
-from wald_agent_reference.core.models import AgentResponse
-from wald_agent_reference.reasoning.answer import AnswerComposer
+from wald_decision_agent.core.config import AppSettings
+from wald_decision_agent.core.models import AgentResponse
+from wald_decision_agent.reasoning.answer import AnswerComposer
 
 
 def test_llm_rewrite_prompt_forbids_unit_assumptions() -> None:

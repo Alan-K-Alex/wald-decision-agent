@@ -11,11 +11,11 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from wald_agent_reference.core.agent import LeadershipInsightAgent
-from wald_agent_reference.core.config import AppSettings
-from wald_agent_reference.ingestion.ingest import DocumentIngestor
-from wald_agent_reference.memory.structured_store import StructuredMemoryStore
-from wald_agent_reference.chat.manager import ChatManager
+from wald_decision_agent.core.agent import LeadershipInsightAgent
+from wald_decision_agent.core.config import AppSettings
+from wald_decision_agent.ingestion.ingest import DocumentIngestor
+from wald_decision_agent.memory.structured_store import StructuredMemoryStore
+from wald_decision_agent.chat.manager import ChatManager
 
 
 @pytest.fixture
@@ -337,7 +337,7 @@ class TestTableInspectionTool:
     
     def test_get_table_preview(self):
         """Test table preview tool exists and can be called"""
-        from wald_agent_reference.core.tools import TableInspectionTool, TablePreview
+        from wald_decision_agent.core.tools import TableInspectionTool, TablePreview
         
         settings = AppSettings(
             structured_store_db_path=Path("outputs/test.db")
@@ -356,7 +356,7 @@ class TestTableInspectionTool:
     
     def test_get_all_table_previews(self):
         """Test getting all table previews"""
-        from wald_agent_reference.core.tools import TableInspectionTool
+        from wald_decision_agent.core.tools import TableInspectionTool
         
         settings = AppSettings(
             structured_store_db_path=Path("outputs/test.db")
@@ -368,7 +368,7 @@ class TestTableInspectionTool:
         assert inspector is not None
         
         # Create a minimal corpus to test with
-        from wald_agent_reference.core.models_v2 import Corpus
+        from wald_decision_agent.core.models_v2 import Corpus
         corpus = Corpus(chunks=[], tables={}, documents={}, visuals=[])
         
         # get_all_table_previews should return an empty dict for empty corpus

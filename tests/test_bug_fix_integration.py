@@ -1,9 +1,9 @@
 """Integration test showing the bug fix in action."""
 
 from pathlib import Path
-from wald_agent_reference.reasoning.planner import PlannerAgent
-from wald_agent_reference.core.agent import LeadershipInsightAgent
-from wald_agent_reference.core.config import load_settings
+from wald_decision_agent.reasoning.planner import PlannerAgent
+from wald_decision_agent.core.agent import LeadershipInsightAgent
+from wald_decision_agent.core.config import load_settings
 
 
 def test_strategy_plans_document_query_routes_to_retrieval():

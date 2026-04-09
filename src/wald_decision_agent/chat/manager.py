@@ -67,7 +67,7 @@ class ChatSettingsFactory:
                 "vector_store_dir": str(session.root_dir / "vector_store"),
                 "structured_store_path": str(session.db_path),
                 "log_file": str(session.root_dir / "logs" / "chat.log"),
-                "supermemory_container_tag": f"wald-agent-reference-{session.chat_id}",
+                "supermemory_container_tag": f"wald-decision-agent-{session.chat_id}",
             }
         )
         return AppSettings(**values)
@@ -237,6 +237,7 @@ class ChatManager:
         question: str,
         response: AgentResponse,
         evidence: list[str] | None = None,
+        source_references: list[str] | None = None,
         plot_urls: list[str] | None = None,
         markdown: str | None = None,
     ) -> None:
@@ -253,6 +254,7 @@ class ChatManager:
                 "answer": response.executive_summary,
                 "key_findings": response.key_findings,
                 "evidence": resolved_evidence,
+                "source_references": source_references or response.source_references,
                 "visual_insights": response.visual_insights,
                 "plot_paths": [str(path) for path in response.plot_paths],
                 "plot_urls": resolved_plot_urls,

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from wald_agent_reference.core.config import AppSettings
-from wald_agent_reference.core.models import CalculationResult
-from wald_agent_reference.rendering.visualize import VisualizationEngine
+from wald_decision_agent.core.config import AppSettings
+from wald_decision_agent.core.models import CalculationResult
+from wald_decision_agent.rendering.visualize import VisualizationEngine
 
 
 def test_visualize_creates_png(tmp_path: Path) -> None:

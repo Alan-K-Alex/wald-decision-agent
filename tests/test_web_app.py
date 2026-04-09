@@ -4,8 +4,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from wald_agent_reference.core.config import AppSettings
-from wald_agent_reference.web import create_app
+from wald_decision_agent.core.config import AppSettings
+from wald_decision_agent.web import create_app
 
 
 def test_web_app_chat_upload_ask_delete_lifecycle(tmp_path: Path) -> None:
