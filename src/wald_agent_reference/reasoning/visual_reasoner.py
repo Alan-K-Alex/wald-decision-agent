@@ -3,9 +3,39 @@ from __future__ import annotations
 import re
 
 from ..core.models import CalculationResult, VisualArtifact
+from ..utils import tokenize
 
 
 class VisualReasoner:
+    _QUESTION_STOPWORDS = {
+        "a",
+        "all",
+        "across",
+        "an",
+        "and",
+        "any",
+        "are",
+        "chart",
+        "figure",
+        "for",
+        "graph",
+        "has",
+        "how",
+        "in",
+        "is",
+        "our",
+        "over",
+        "quarter",
+        "quarterly",
+        "show",
+        "shows",
+        "subsidiaries",
+        "the",
+        "trend",
+        "visual",
+        "what",
+    }
+
     def answer(self, question: str, visuals: list[VisualArtifact]) -> CalculationResult | None:
         lowered = question.lower()
         if not any(term in lowered for term in ["chart", "graph", "visual", "figure", "trend", "quarterly"]):
@@ -14,6 +44,8 @@ class VisualReasoner:
             return None
 
         visual = visuals[0]
+        if not self._is_grounded_visual_match(question, visual):
+            return None
         extracted = visual.extracted_text
         quarters = re.findall(r"\bQ[1-4]\b", extracted, flags=re.IGNORECASE)
         numbers = [float(match) for match in re.findall(r"\b\d+(?:\.\d+)?\b", extracted)]
@@ -48,3 +80,23 @@ class VisualReasoner:
             ],
             evidence_refs=[visual.source_path.name],
         )
+
+    def _is_grounded_visual_match(self, question: str, visual: VisualArtifact) -> bool:
+        visual_text = " ".join(
+            [
+                visual.metadata.get("title", "") if isinstance(visual.metadata.get("title", ""), str) else "",
+                visual.extracted_text,
+                visual.summary,
+                visual.source_path.stem,
+            ]
+        ).lower()
+        visual_tokens = set(tokenize(visual_text))
+
+        significant_question_tokens = {
+            token
+            for token in tokenize(question)
+            if token not in self._QUESTION_STOPWORDS and not re.fullmatch(r"q[1-4]|\d+", token)
+        }
+        if not significant_question_tokens:
+            return True
+        return bool(significant_question_tokens & visual_tokens)

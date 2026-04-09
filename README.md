@@ -19,7 +19,9 @@ It combines:
 - SQLite-backed structured reasoning for tables
 - deterministic numeric computation for calculations
 - planner-based routing to choose the right path per query
-- optional Gemini and Supermemory integrations
+- Groq-based answer formatting by default
+- Gemini for vision extraction and embeddings
+- optional Supermemory-backed retrieval
 
 ## Key Features
 
@@ -33,10 +35,13 @@ It combines:
 
 ## Requirements
 
-- Python `3.11+` recommended
+- Python `3.9+`
 - `pip`
 - optional API keys:
+  - `GROQ_API_KEY`
   - `GEMINI_API_KEY`
+  - `HUGGINGFACE_API_KEY`
+  - `OPENAI_API_KEY`
   - `SUPERMEMORY_API_KEY`
 
 ## Setup
@@ -51,11 +56,20 @@ cp .env.example .env
 Example `.env`:
 
 ```env
+GROQ_API_KEY=
 GEMINI_API_KEY=
+HUGGINGFACE_API_KEY=
+OPENAI_API_KEY=
 SUPERMEMORY_API_KEY=
 ```
 
-The project runs locally without keys. Add `GEMINI_API_KEY` for Gemini formatting and vision-based extraction. Add `SUPERMEMORY_API_KEY` if you want to enable Supermemory-backed retrieval.
+The project runs locally without keys using fallback behavior.
+
+By default, `config/settings.yaml` sets `llm_provider: groq`, so `GROQ_API_KEY` is the main key for answer formatting.
+
+`GEMINI_API_KEY` is used for Gemini-based vision extraction and embeddings.
+
+`SUPERMEMORY_API_KEY` is optional and only needed if you want Supermemory-backed retrieval.
 
 ## Run The Web App
 

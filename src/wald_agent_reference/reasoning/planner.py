@@ -12,7 +12,7 @@ class PlannerAgent:
         lowered = question.lower()
         should_visualize = any(term in lowered for term in ["plot", "chart", "graph", "visual", "trend", "compare", "comparison"])
         needs_explanation = any(term in lowered for term in ["why", "explain", "driver", "drivers", "because", "contributed", "context"])
-        has_structured_need = any(term in lowered for term in ["plan", "target", "variance", "missed", "beat", "revenue", "growth", "margin", "underperform", "lowest", "highest", "count", "sum", "average", "trend"])
+        has_structured_need = any(term in lowered for term in ["plan", "target", "variance", "missed", "beat", "revenue", "growth", "margin", "underperform", "lowest", "highest", "count", "sum", "average", "trend", "risk", "risks"])
         
         # Detect questions about narrative/qualitative topics (leadership priorities, risks, improvements, challenges, opinions)
         is_narrative_question = any(term in lowered for term in [
@@ -27,7 +27,7 @@ class PlannerAgent:
         requests_document_data = any(term in lowered for term in [
             "document", "as per document", "from document", "per document", "narrative", 
             "text", "written", "brief", "report", "strategic", "priorities", "according to",
-            "from the", "in the", "per the"
+            "in the text", "from the text", "per the report"
         ])
 
         # NEW: When there's mixed needs, always fetch from BOTH sources and let answer composer decide
@@ -109,9 +109,10 @@ class PlannerAgent:
             self.logger.debug("Planner selected visual route for question: %s", question)
             return plan
 
-        if any(term in lowered for term in ["revenue", "growth", "margin", "underperform", "lowest", "highest", "count", "sum", "average", "trend"]):
+        if any(term in lowered for term in ["revenue", "growth", "margin", "underperform", "lowest", "highest", "count", "sum", "average", "trend", "risk", "risks"]):
             # Unless it's asking about narrative aspects of these topics
-            if is_narrative_question:
+            # But keep 'risk' queries structured as they often map to a risk register
+            if is_narrative_question and not any(term in lowered for term in ["risk", "risks"]):
                 plan = QueryPlan(
                     primary_route="retrieval",
                     route_sequence=["retrieval", "calculator", "sql"],  # Full sequence
@@ -129,8 +130,8 @@ class PlannerAgent:
                 primary_route="calculator",
                 route_sequence=["calculator", "sql", "retrieval"],  # Always include retrieval
                 reasoning=[
-                    "Query is numeric or ranking-oriented.",
-                    "Use deterministic computation with table data.",
+                    "Query is numeric, ranking-oriented, or a qualitative list (risks).",
+                    "Use deterministic computation or lookup with table data.",
                     "Also retrieve narrative explanations.",
                     "Answer composer selects the most relevant source(s).",
                 ],

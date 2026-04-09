@@ -45,6 +45,11 @@ class CalculationEngine:
             if result:
                 return result
 
+        if any(term in lowered for term in ["risk", "risks", "challenge", "challenges", "item", "items", "priority", "priorities"]):
+            result = self._calculate_list(question, tables)
+            if result:
+                return result
+
         return self._calculate_ranking(question, tables) or self._calculate_trend(question, tables)
 
     def _calculate_temporal_lookup(self, question: str, tables: list[StructuredTable]) -> CalculationResult | None:
@@ -309,6 +314,88 @@ class CalculationEngine:
             )
         return None
 
+    def _calculate_list(self, question: str, tables: list[StructuredTable]) -> CalculationResult | None:
+        from ..core.logging import get_logger
+        logger = get_logger("reasoning.calculator")
+        
+        target_metric = self._detect_target_metric(question)
+        logger.info(f"Qualitative list lookup for metric: {target_metric}")
+        if target_metric not in ["risk", "item", "priority", "challenge"]:
+            return None
+
+        # Look for the best table matching the target metric using a scoring system
+        candidates: list[tuple[int, StructuredTable]] = []
+        
+        for table in tables:
+            frame = table.dataframe.copy()
+            cols = [str(c).lower() for c in frame.columns]
+            score = 0
+            
+            # Bonus if filename matches target metric
+            if target_metric in table.source_path.name.lower():
+                score += 5
+            
+            # Bonus if columns match keywords
+            if target_metric == "risk":
+                if any(m in c for m in ["risk", "severity", "status"] for c in cols):
+                    score += 2
+            elif any(target_metric in c for c in cols):
+                score += 2
+                
+            if score > 0:
+                candidates.append((score, table))
+                
+        if not candidates:
+            return None
+            
+        # Select best table by score
+        best_table = sorted(candidates, key=lambda x: x[0], reverse=True)[0][1]
+        logger.info(f"Target metric '{target_metric}' selected best table: {best_table.source_path.name} (score {sorted(candidates, key=lambda x: x[0], reverse=True)[0][0]})")
+            
+        frame = best_table.dataframe.copy()
+        cols = list(frame.columns)
+        
+        # Determine sorting (e.g. prioritize High severity)
+        severity_col = next((c for c in cols if "severity" in str(c).lower()), None)
+        if severity_col:
+            sev_map = {"high": 3, "medium": 2, "low": 1}
+            frame["_sev_score"] = frame[severity_col].astype(str).str.lower().map(sev_map).fillna(0)
+            frame = frame.sort_values("_sev_score", ascending=False)
+            
+        # Determine primary column to list
+        primary_col = next((c for c in cols if any(m in str(c).lower() for m in [target_metric, "category", "item", "description", "title", "strategy"])), cols[0])
+        
+        items = []
+        findings = []
+        for _, row in frame.iterrows():
+            item_name = str(row[primary_col]).strip()
+            if not item_name or item_name.lower() in ["none", "nan", "null"]:
+                continue
+            
+            detail = ""
+            if severity_col:
+                detail = f" ({row[severity_col]} severity)"
+            
+            items.append(f"{item_name}{detail}")
+            findings.append(f"{item_name}: " + ", ".join(f"{c}={row[c]}" for c in cols if c != primary_col and not str(c).startswith("_")))
+            
+        if not items:
+            return None
+            
+        answer = f"The identified {target_metric}s include: " + ", ".join(items[:5]) + "."
+        trace = [
+            f"Qualitative list generated from {best_table.source_path.name} / {best_table.metadata.get('sheet_name', 'Sheet1')}.",
+            f"Primary column: {primary_col}",
+            f"Items found: {len(items)}",
+        ]
+        
+        return CalculationResult(
+            answer=answer,
+            findings=findings[:5],
+            trace=trace,
+            evidence_refs=[f"{best_table.source_path.name} [{best_table.metadata.get('sheet_name', 'Sheet1')}]"],
+        )
+
     def _explain_metric_method(self, question: str, tables: list[StructuredTable]) -> CalculationResult | None:
         target_metric = self._detect_target_metric(question)
         supporting_refs: list[str] = []
@@ -373,9 +460,11 @@ class CalculationEngine:
         lowered = question.lower()
         if "underperform" in lowered:
             return "performance"
-        candidates = ["revenue", "margin", "profit", "score", "performance", "risk", "cost"]
+        candidates = ["revenue", "margin", "profit", "score", "performance", "risk", "risks", "item", "priority", "challenge", "cost"]
         for candidate in candidates:
             if candidate in lowered:
+                # Normalize plural
+                if candidate == "risks": return "risk"
                 return candidate
         tokens = tokenize(question)
         return tokens[-1] if tokens else "metric"

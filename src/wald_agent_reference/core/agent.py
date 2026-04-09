@@ -27,11 +27,20 @@ class LeadershipInsightAgent:
         self.answerer = AnswerComposer(self.settings)
 
     def ask(self, question: str, docs_path: str | Path, generate_plot: bool = False) -> AgentResponse:
-        plan = self.planner.plan(question)
+        # Extract the core user question for routing/planning.
+        # Follow-up questions are expanded with conversation context by the
+        # ConversationContextResolver, but the planner, calculator, and SQL
+        # agent should route and detect metrics based on the actual user intent,
+        # not the previous conversation context which can bias routing toward
+        # the wrong tables (e.g. regional data instead of quarterly data).
+        core_question = self._extract_core_question(question)
+        plan = self.planner.plan(core_question)
         self.logger.info("Received question: %s", question)
+        if core_question != question:
+            self.logger.info("Core question (for routing): %s", core_question)
         self.logger.info("Planner route sequence: %s", " -> ".join(plan.route_sequence))
         corpus, catalog = self._prepare_context(docs_path)
-        retrieved = self._retrieve_evidence(question, plan, corpus)
+        retrieved = self._retrieve_evidence(core_question, plan, corpus)
         self.logger.info("Retriever returned %d chunks", len(retrieved))
         # Bind retrieved evidence back to the higher-fidelity structured objects before reasoning.
         table_ids = {
@@ -54,19 +63,19 @@ class LeadershipInsightAgent:
         for route in plan.route_sequence:
             if route == "sql":
                 self.logger.info("Attempting SQL route")
-                sql_result = self.tools.sql_agent.answer(question, catalog)
+                sql_result = self.tools.sql_agent.answer(core_question, catalog)
                 if sql_result is not None:
                     route_results.append(sql_result)
                     
             elif route == "visual":
                 self.logger.info("Attempting visual reasoning route")
-                visual_result = self.tools.visual_reasoner.answer(question, visuals)
+                visual_result = self.tools.visual_reasoner.answer(core_question, visuals)
                 if visual_result is not None:
                     route_results.append(visual_result)
                     
             elif route == "calculator":
                 self.logger.info("Attempting calculator route")
-                calc_result = self.tools.calculator.calculate(question, tables)
+                calc_result = self.tools.calculator.calculate(core_question, tables)
                 if calc_result is not None:
                     route_results.append(calc_result)
                     
@@ -75,16 +84,16 @@ class LeadershipInsightAgent:
                 self.logger.info("Attempting retrieval route")
                 continue
         
-        if not route_results and corpus.tables and not self._should_skip_structured_fallback(question, plan):
+        if not route_results and corpus.tables and not self._should_skip_structured_fallback(core_question, plan):
             # Retrieval can miss the best table, so use the full structured catalog as a grounded fallback.
             self.logger.info("Primary planned routes did not resolve query, falling back to all structured tables")
-            fallback_result = self.tools.calculator.calculate(question, list(corpus.tables.values()))
+            fallback_result = self.tools.calculator.calculate(core_question, list(corpus.tables.values()))
             if fallback_result is not None:
                 route_results.append(fallback_result)
 
         # Mixed questions about trends/comparisons should still leverage chart artifacts when available.
         if plan.should_visualize and visuals:
-            visual_result = self.tools.visual_reasoner.answer(question, visuals)
+            visual_result = self.tools.visual_reasoner.answer(core_question, visuals)
             if visual_result is not None and not any(result.answer == visual_result.answer for result in route_results):
                 route_results.append(visual_result)
 
@@ -92,14 +101,51 @@ class LeadershipInsightAgent:
         supplemental_calculations = route_results[1:] if len(route_results) > 1 else []
 
         visualizations = []
+        seen_chart_signatures: list[tuple[str, tuple, tuple]] = []  # (chart_type, labels, values)
         if generate_plot or plan.should_visualize:
             for index, result in enumerate(route_results):
-                if not self.tools.visualizer.should_visualize(question, result) and not generate_plot and not plan.should_visualize:
+                if not self.tools.visualizer.should_visualize(core_question, result) and not generate_plot and not plan.should_visualize:
                     continue
                 if result.chart_data is None:
                     continue
+                # Deduplicate charts: skip if a chart with substantially
+                # overlapping data has already been created.  Two charts are
+                # considered duplicates when they share the same chart type AND
+                # BOTH (a) their labels overlap significantly AND (b) their
+                # numeric values are similar.  Requiring both prevents
+                # suppressing legitimate charts that share time-period labels
+                # but plot different metrics (e.g. revenue vs margin).
+                chart_type = result.chart_data.get("type", "")
+                chart_labels = tuple(str(l) for l in result.chart_data.get("labels", []))
+                chart_values = tuple(float(v) for v in result.chart_data.get("values", []) if v is not None)
+                is_duplicate = False
+                for seen_type, seen_labels, seen_values in seen_chart_signatures:
+                    if chart_type != seen_type:
+                        continue
+                    # Check label overlap (normalize: lowercase, strip year suffix)
+                    norm = lambda s: s.lower().split()[0] if s else s
+                    norm_labels = {norm(l) for l in chart_labels}
+                    norm_seen = {norm(l) for l in seen_labels}
+                    label_overlap = norm_labels & norm_seen
+                    labels_match = label_overlap and len(label_overlap) >= min(len(norm_labels), len(norm_seen)) * 0.5
+                    # Check value similarity: sorted values within 1% tolerance
+                    values_match = False
+                    if chart_values and seen_values and len(chart_values) == len(seen_values):
+                        max_val = max(max(chart_values), max(seen_values), 1)
+                        values_match = all(
+                            abs(a - b) <= max_val * 0.01
+                            for a, b in zip(sorted(chart_values), sorted(seen_values))
+                        )
+                    # Must match on BOTH labels and values to be a true duplicate
+                    if labels_match and values_match:
+                        is_duplicate = True
+                        break
+                if is_duplicate:
+                    self.logger.info("Skipping duplicate chart (type=%s, title=%s)", chart_type, result.chart_data.get("title", ""))
+                    continue
+                seen_chart_signatures.append((chart_type, chart_labels, chart_values))
                 suffix = result.chart_data.get("title", f"chart-{index + 1}")
-                visualization = self.tools.visualizer.create(question, result, suffix=suffix)
+                visualization = self.tools.visualizer.create(core_question, result, suffix=suffix)
                 if visualization is not None:
                     visualizations.append(visualization)
                     self.logger.info("Generated plot at %s", visualization.path)
@@ -301,3 +347,56 @@ class LeadershipInsightAgent:
         lowered = question.lower()
         has_temporal_constraint = any(term in lowered for term in ["q1", "q2", "q3", "q4", "quarter", "quarterly", "fy"])
         return plan.primary_route == "retrieval" and has_temporal_constraint
+
+    @staticmethod
+    def _extract_core_question(question: str) -> str:
+        """Extract the core user question from a contextualized follow-up string.
+
+        ConversationContextResolver expands follow-ups into:
+            Previous user question: ...
+            Previous assistant answer: ...
+            Follow-up question: <actual question>
+
+        The planner, calculator, and SQL agent should route based on the actual
+        user intent, not the previous conversation context which can bias metric
+        detection and table selection (e.g. routing to regional tables when the
+        user asked about quarterly trends).
+
+        However, very short/vague follow-ups (e.g. "who owns the most?") may
+        lose critical topic context.  When the core question lacks domain
+        keywords, we enrich it with the topic noun from the prior question so
+        routing still works.  Only the previous *question* is used for this —
+        never the previous *answer*, which is what caused the original bias.
+        """
+        marker = "Follow-up question:"
+        if marker not in question:
+            return question
+
+        core = question.split(marker, 1)[1].strip()
+
+        # If the core question already has clear routing signals, return as-is.
+        routing_keywords = {
+            "revenue", "margin", "cost", "risk", "score", "plan", "target",
+            "trend", "growth", "variance", "department", "region", "quarter",
+            "operational", "performance", "budget", "profit",
+        }
+        core_tokens = {t.lower().rstrip("?.,!") for t in core.split()}
+        if core_tokens & routing_keywords:
+            return core
+
+        # The core question is vague (e.g. "who owns the most?"), so extract
+        # topic keywords from the previous *question* only (not the answer)
+        # to help routing without re-introducing the answer-bias problem.
+        prev_q_marker = "Previous user question:"
+        if prev_q_marker in question:
+            prev_q_part = question.split(prev_q_marker, 1)[1]
+            # Take text up to the next section marker
+            for end_marker in ["Previous assistant answer:", marker]:
+                if end_marker in prev_q_part:
+                    prev_q_part = prev_q_part.split(end_marker, 1)[0]
+            prev_tokens = {t.lower().rstrip("?.,!") for t in prev_q_part.split()}
+            topic_tokens = prev_tokens & routing_keywords
+            if topic_tokens:
+                core = core.rstrip("?").rstrip() + " (" + " ".join(sorted(topic_tokens)) + ")?"
+
+        return core
