@@ -21,7 +21,6 @@ It combines:
 - planner-based routing to choose the right path per query
 - Groq-based answer formatting by default
 - Gemini for vision extraction and embeddings
-- optional Supermemory-backed retrieval
 
 ## Key Features
 
@@ -38,14 +37,12 @@ It combines:
 - Python `3.9+`
 - `pip`
 - optional API keys:
-  - `GROQ_API_KEY`
-  - `GEMINI_API_KEY`
-  - `HUGGINGFACE_API_KEY`
-  - `OPENAI_API_KEY`
-  - `SUPERMEMORY_API_KEY`
+  - `GROQ_API_KEY` (Primary for answer formatting)
+  - `GEMINI_API_KEY` (For vision extraction and embeddings)
 
 ## Setup
 
+### macOS / Linux
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
@@ -53,38 +50,45 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
+### Windows
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+copy .env.example .env
+```
+
 Example `.env`:
 
 ```env
-GROQ_API_KEY=
-GEMINI_API_KEY=
-HUGGINGFACE_API_KEY=
-OPENAI_API_KEY=
-SUPERMEMORY_API_KEY=
+GROQ_API_KEY=your_key_here
+GEMINI_API_KEY=your_key_here
 ```
 
-The project runs locally without keys using fallback behavior.
-
-By default, `config/settings.yaml` sets `llm_provider: groq`, so `GROQ_API_KEY` is the main key for answer formatting.
-
-`GEMINI_API_KEY` is used for Gemini-based vision extraction and embeddings.
-
-`SUPERMEMORY_API_KEY` is optional and only needed if you want Supermemory-backed retrieval.
+The project runs locally without keys using fallback behavior for formatting.
 
 ## Run The Web App
 
+### macOS / Linux
 ```bash
-PYTHONPATH=src python -m wald_agent_reference.main serve --host 127.0.0.1 --port 8000
+PYTHONPATH=src python -m wald_agent_reference.main serve --host 0.0.0.0 --port 8000
 ```
 
-Then open [http://127.0.0.1:8000](http://127.0.0.1:8000).
+### Windows
+```bash
+set PYTHONPATH=src
+python -m wald_agent_reference.main serve --host 0.0.0.0 --port 8000
+```
 
-Typical flow:
+Then open [http://localhost:8000](http://localhost:8000).
 
-1. Create a chat
-2. Upload a folder of documents
-3. Ask questions in the chat
-4. Review the grounded answer, evidence links, and generated plots
+## How to Test
+
+To see the system in action:
+
+1. **Upload Data**: You can use the sample business documents provided in the `data/raw/` folder. Simply upload this folder during the "Upload Folder" step in the UI.
+2. **Ask Questions**: Try asking questions from the `data/sample_questions/` folder to see how the agent handles structured, narrative, and visual data.
+3. **Review Reports**: After an answer is generated, check the grounded evidence, source links, and any generated plots.
 
 ## Run From The CLI
 
@@ -96,20 +100,18 @@ PYTHONPATH=src python -m wald_agent_reference.main ask --docs data/raw --questio
 
 ```text
 config/settings.yaml
-data/raw/
-notebooks/demo.ipynb
+data/raw/               # Sample document folder for testing
+data/sample_questions/  # Sample questions to try
 src/wald_agent_reference/
   core/
   ingestion/
   retrieval/
   reasoning/
-  memory/
   rendering/
   web/
 ```
 
 ## Notes
 
-- `data/raw/` contains sample files for local runs
-- generated plots and reports are created per chat during execution
-- the notebook is optional and can be used as an alternate demo surface
+- Generated plots and reports are created per chat during execution.
+- The system is designed to favor structured data (CSV/Excel) for numeric queries while using narrative text for explanations.

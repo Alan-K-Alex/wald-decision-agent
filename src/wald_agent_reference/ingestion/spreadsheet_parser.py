@@ -20,7 +20,9 @@ class SpreadsheetParser:
         if suffix in {".csv", ".tsv"}:
             separator = "\t" if suffix == ".tsv" else ","
             frame = pd.read_csv(path, sep=separator)
-            return [self._table_from_dataframe(path, frame, sheet_name="Sheet1")]
+            # Add source row tracking for CSVs (starting at row 2 for header-based CSVs)
+            source_rows = list(range(2, len(frame) + 2))
+            return [self._table_from_dataframe(path, frame, sheet_name="Sheet1", source_rows=source_rows)]
         if suffix == ".xlsx":
             return self._parse_xlsx(path)
         if suffix == ".xls":

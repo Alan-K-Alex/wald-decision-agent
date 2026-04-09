@@ -583,7 +583,10 @@ class CalculationEngine:
             return None
         prepared[dimension_col] = prepared[dimension_col].astype(str)
         prepared = prepared[prepared[dimension_col].str.strip() != ""]
-        return dimension_col, metric_col, prepared[[dimension_col, metric_col]]
+        cols_to_keep = [dimension_col, metric_col]
+        if "_source_row" in prepared.columns:
+            cols_to_keep.append("_source_row")
+        return dimension_col, metric_col, prepared[cols_to_keep]
 
     def _best_numeric_column(self, frame: pd.DataFrame, target_metric: str) -> str | None:
         numeric_columns = self._numeric_columns(frame)

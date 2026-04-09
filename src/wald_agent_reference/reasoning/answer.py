@@ -133,6 +133,8 @@ class AnswerComposer:
             for ref in calculation.evidence_refs:
                 if ref not in source_refs:
                     source_refs.append(ref)
+                    
+            # Handle supplemental results (often from multi-part questions)
             for extra in supplemental_calculations:
                 for ref in extra.evidence_refs:
                     if ref not in source_refs:
@@ -143,20 +145,27 @@ class AnswerComposer:
                 for trace_item in extra.trace:
                     if trace_item not in calculations:
                         calculations.append(trace_item)
+            
+            # Merge supplemental answers into the executive summary if they are distinct
+            supplemental_summary = self._summarize_supplemental_results(question, supplemental_calculations)
+            if supplemental_summary and supplemental_summary.lower() not in executive_summary.lower():
+                prefix = ". " if not executive_summary.endswith(".") else " "
+                executive_summary = f"{executive_summary.rstrip('.')}{prefix}Additionally, {supplemental_summary}."
+
             if self._is_explanatory_question(question):
                 causal_context, causal_evidence = self._extract_causal_context(question, high_quality_retrieved)
-                supplemental_context = self._summarize_supplemental_results(question, supplemental_calculations)
-                executive_summary = self._compose_explanatory_summary(
-                    calculation.answer,
-                    causal_context=causal_context,
-                    supplemental_context=supplemental_context,
-                )
-                if causal_context:
-                    cause_finding = f"Supporting narrative attributes the miss to {causal_context.rstrip('.') }."
-                    if cause_finding not in key_findings:
-                        key_findings.append(cause_finding)
+                # Explanation logic already partially handled by the merger above, 
+                # but we keep causal context logic for 'why' questions.
+                if causal_context and causal_context.lower() not in executive_summary.lower():
+                    executive_summary = f"{executive_summary.rstrip('.')}, and the supporting narrative attributes the miss to {causal_context.rstrip('.') }."
+                
                 if causal_evidence and causal_evidence not in evidence:
                     evidence.insert(0, causal_evidence)
+            
+            # If evidence section is empty, populate it with key data points from the structured findings
+            # to ensure the report feels grounded even when narrative retrieval fails.
+            if not evidence and key_findings:
+                evidence = [f"Structured evidence: {finding}" for finding in key_findings[:3]]
         else:
             # Fallback to document retrieval
             if self._has_sufficient_grounding(question, high_quality_retrieved):
@@ -333,17 +342,42 @@ class AnswerComposer:
         return causal_phrase, evidence_line
 
     def _summarize_supplemental_results(self, question: str, supplemental_calculations: list[CalculationResult]) -> str | None:
-        lowered = question.lower()
+        """Merge answers from multiple calculation results into a cohesive string."""
+        summaries = []
+        lowered_question = question.lower()
+        
         for extra in supplemental_calculations:
+            if not extra.answer:
+                continue
+                
+            # If the answer is already mentioned in the question (echo), move on
+            if extra.answer.lower() in lowered_question:
+                continue
+                
+            # Specialized summary for trends if not fully captured in the answer string
             chart_data = extra.chart_data or {}
-            if chart_data.get("type") == "line" and any(term in lowered for term in ["trend", "quarter", "quarterly"]):
+            if chart_data.get("type") == "line" and any(term in lowered_question for term in ["trend", "quarter", "quarterly"]):
                 labels = chart_data.get("labels", [])
                 values = chart_data.get("values", [])
                 if labels and values:
-                    return f"{chart_data.get('title', 'Trend')} increased from {values[0]:,.2f} in {labels[0]} to {values[-1]:,.2f} in {labels[-1]}."
-            if extra.answer and any(term in extra.answer.lower() for term in ["trend", "increasing", "decreasing", "flat"]):
-                return extra.answer
-        return None
+                    trend_summary = f"the {chart_data.get('title', 'trend')} moved from {values[0]:,.2f} in {labels[0]} to {values[-1]:,.2f} in {labels[-1]}"
+                    if trend_summary not in summaries:
+                        summaries.append(trend_summary)
+                    continue
+
+            # Default: use the calculation's answer string
+            summary = extra.answer.strip()
+            if summary and summary not in summaries:
+                summaries.append(summary)
+                
+        if not summaries:
+            return None
+            
+        if len(summaries) == 1:
+            return summaries[0]
+            
+        # Join multiple summaries nicely
+        return "; ".join(summaries)
 
     def _compose_explanatory_summary(
         self,
