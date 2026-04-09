@@ -20,6 +20,7 @@ It combines:
 - deterministic numeric computation for calculations
 - planner-based routing to choose the right path per query
 - Groq-based answer formatting by default
+- ChromaDB for persistent, high-performance vector storage
 - Gemini for vision extraction and embeddings
 
 ## Key Features
@@ -31,6 +32,7 @@ It combines:
 - Grounded answers with references to the uploaded source files
 - Safe handling of unsupported or missing metrics by abstaining instead of guessing
 - Plot generation for supported trend and comparison questions
+- Professional HNSW indexing for sub-second retrieval on large file sets
 
 ## Requirements
 
