@@ -112,7 +112,12 @@ src/wald_decision_agent/
   web/
 ```
 
-## Notes
+# Architectural Assumptions
 
-- Generated plots and reports are created per chat during execution.
-- The system is designed to favor structured data (CSV/Excel) for numeric queries while using narrative text for explanations.
+This system was built with several key engineering assumptions to ensure enterprise-grade reliability and accuracy:
+
+1. **Structured-First Priority**: For numeric, ranking, or performance-related queries, the agent prioritizes structured data (CSV/Excel) over narrative text. This ensures that quantitative answers are derived from raw data rather than potentially misinterpreted summaries.
+2. **Hybrid Reasoning Engine**: We assume that a single RAG (Retrieval-Augmented Generation) pipeline is insufficient for complex business queries. Instead, the agent uses a **Planner** to route queries between SQL execution (for lookups), a Deterministic Calculator (for math), and Vector Retrieval (for narrative context).
+3. **Multimodal Grounding**: Visual artifacts (charts/plots) are not treated as secondary. The system assumes that crucial business trends are often trapped in images; hence, a Gemini-powered **Visual Reasoner** is integrated into the core decision loop.
+4. **Isolated Knowledge Contexts**: To maintain security and data integrity, each chat session is architected as an isolated environment with its own dedicated ChromaDB collection, SQLite database, and file storage.
+5. **Abstention over Hallucination**: The system is tuned to favor accuracy over "helpfulness." If a requested metric or driver cannot be grounded in the provided files, the agent is instructed to state the limitation rather than attempt to infer or guess the result.
