@@ -94,6 +94,5 @@ class ToolRouter:
         self.structured_store = StructuredMemoryStore(settings.structured_store_db_path)
         self.sql_agent = SQLQueryAgent(self.structured_store)
         self.table_inspector = TableInspectionTool(self.structured_store)
-        self.memory_backend = build_memory_backend(settings)
         self.visual_reasoner = VisualReasoner()
 

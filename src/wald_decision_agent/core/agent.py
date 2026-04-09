@@ -8,7 +8,6 @@ from ..ingestion.ingest import DocumentIngestor
 from ..reasoning.answer import AnswerComposer
 from ..reasoning.planner import PlannerAgent
 from ..retrieval.retrieve import HybridRetriever
-from ..retrieval.supermemory_retrieve import SupermemoryRetriever
 from .config import AppSettings, load_settings
 from .logging import configure_logging, get_logger
 from .models import AgentResponse, StructuredTable, Corpus, DocumentChunk, ExtractedDocument, VisualArtifact
@@ -210,22 +209,6 @@ class LeadershipInsightAgent:
         except Exception as exc:
             self.logger.debug("Failed to save ingestion metadata: %s", exc)
         
-        # Sync to memory backend with graceful error handling
-        # DISABLED: Supermemory API is rate-limiting (HTTP 429), blocking requests for 25-30s
-        # Local retrieval fallback is working correctly, so sync is not critical
-        # Uncomment below if needed in the future with async processing
-        # try:
-        #     for document in corpus.documents.values():
-        #         self.tools.memory_backend.sync_document(document)
-        #     for chunk in corpus.chunks:
-        #         self.tools.memory_backend.sync_chunk(chunk)
-        #     for table in corpus.tables.values():
-        #         self.tools.memory_backend.sync_table(table)
-        #     for visual in corpus.visuals.values():
-        #         self.tools.memory_backend.sync_visual(visual)
-        # except Exception as exc:
-        #     self.logger.warning("Memory backend sync encountered an error: %s. Continuing with query processing.", exc)
-        
         return corpus, catalog
 
     def _load_corpus_from_store(self) -> Corpus | None:
@@ -266,29 +249,7 @@ class LeadershipInsightAgent:
                     if item.chunk.chunk_id not in {r.chunk.chunk_id for r in local_results}:
                         local_results.append(item)
         
-        if self.settings.retrieval_backend not in {"auto", "supermemory"}:
-            return local_results
-
-        try:
-            memory_results = SupermemoryRetriever(corpus, self.tools.memory_backend).search(question, self.settings.top_k)
-            if not memory_results:
-                self.logger.info("Supermemory retrieval unavailable or empty, falling back to local hybrid retrieval")
-                return local_results
-
-            merged = []
-            seen: set[str] = set()     
-            for item in memory_results + local_results:
-                if item.chunk.chunk_id in seen:
-                    continue
-                seen.add(item.chunk.chunk_id)
-                merged.append(item)
-                if len(merged) >= self.settings.top_k:
-                    break
-            self.logger.info("Using Supermemory-assisted retrieval for %s route", plan.primary_route)
-            return merged
-        except Exception as exc:
-            self.logger.debug("Supermemory retrieval failed: %s. Using local results.", exc)
-            return local_results
+        return local_results
 
     def _generate_expanded_queries(self, question: str) -> list[str]:
         """Generate expanded query variations for narrative questions."""

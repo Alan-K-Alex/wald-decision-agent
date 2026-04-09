@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
@@ -101,61 +102,71 @@ class VectorSearchResult:
 
 
 class VectorIndex:
-    def __init__(self, settings: AppSettings, embedder: BaseEmbedder, chunks: dict[str, DocumentChunk], matrix: np.ndarray) -> None:
+    def __init__(self, settings: AppSettings, embedder: BaseEmbedder, chunks: dict[str, DocumentChunk]) -> None:
+        import chromadb
         self.settings = settings
         self.embedder = embedder
         self.chunks = chunks
         self.logger = get_logger("retrieval.vector_index")
-        self.matrix = self._sanitize(matrix)
-        self.chunk_ids = list(chunks.keys())
+        
+        # Initialize Persistent Chroma Client
+        store_path = str(settings.vector_store_path.absolute())
+        self.client = chromadb.PersistentClient(path=store_path)
+        
+        # Collection name is scoped to the embedder type to avoid conflicts
+        collection_name = f"chunks_{self.embedder.backend_name}"
+        self.collection = self.client.get_or_create_collection(
+            name=collection_name,
+            metadata={"hnsw:space": "cosine"}
+        )
 
     @classmethod
     def build(cls, corpus: Corpus, settings: AppSettings) -> "VectorIndex":
-        """Build vector index, attempting to load from cache first if available."""
-        # Try loading from persisted cache
-        cached_index = cls.load(corpus, settings)
-        if cached_index is not None:
-            return cached_index
-        
-        # If cache miss, build fresh index
+        """Build or load vector index using ChromaDB."""
         embedder = cls._select_embedder(settings)
         chunks = {chunk.chunk_id: chunk for chunk in corpus.chunks}
-        texts = [chunk.content for chunk in corpus.chunks]
-        matrix = embedder.embed_texts(texts) if texts else np.zeros((0, settings.vector_dim), dtype=np.float32)
-        index = cls(settings=settings, embedder=embedder, chunks=chunks, matrix=matrix)
-        index.persist()
+        index = cls(settings=settings, embedder=embedder, chunks=chunks)
+        
+        # Check if we need to ingest data
+        if index.collection.count() != len(corpus.chunks):
+            index.logger.info("Ingesting %d chunks into ChromaDB", len(corpus.chunks))
+            index._ingest_corpus(corpus)
+        else:
+            index.logger.info("ChromaDB index loaded with %d chunks", index.collection.count())
+            
         return index
+
+    def _ingest_corpus(self, corpus: Corpus) -> None:
+        """Embed and add corpus to ChromaDB."""
+        if not corpus.chunks:
+            return
+
+        texts = [chunk.content for chunk in corpus.chunks]
+        ids = [chunk.chunk_id for chunk in corpus.chunks]
+        metadatas = [{"source": chunk.source_path.name} for chunk in corpus.chunks]
+        
+        # Embed in batches to avoid API or memory limits
+        batch_size = 100
+        for i in range(0, len(texts), batch_size):
+            batch_texts = texts[i : i + batch_size]
+            batch_ids = ids[i : i + batch_size]
+            batch_metadatas = metadatas[i : i + batch_size]
+            
+            embeddings = self.embedder.embed_texts(batch_texts)
+            # Chroma expects a list of lists for embeddings
+            embeddings_list = embeddings.tolist()
+            
+            self.collection.upsert(
+                ids=batch_ids,
+                embeddings=embeddings_list,
+                metadatas=batch_metadatas,
+                documents=batch_texts
+            )
 
     @classmethod
     def load(cls, corpus: Corpus, settings: AppSettings) -> "VectorIndex | None":
-        """Load vector index from persisted cache."""
-        try:
-            store_dir = settings.vector_store_path
-            metadata_path = store_dir / "index_metadata.json"
-            matrix_path = store_dir / "chunk_vectors.npy"
-            
-            if not metadata_path.exists() or not matrix_path.exists():
-                return None
-            
-            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-            matrix = np.load(matrix_path)
-            
-            # Verify the cached index is compatible with current corpus
-            cached_chunk_ids = set(metadata.get("chunk_ids", []))
-            current_chunk_ids = {chunk.chunk_id for chunk in corpus.chunks}
-            
-            if cached_chunk_ids != current_chunk_ids:
-                # Cache is stale - need to rebuild
-                return None
-            
-            # Reconstruct the embedder and chunks mapping
-            embedder = cls._select_embedder(settings)
-            chunks = {chunk.chunk_id: chunk for chunk in corpus.chunks}
-            
-            index = cls(settings=settings, embedder=embedder, chunks=chunks, matrix=matrix)
-            return index
-        except Exception as exc:
-            return None  # If cache load fails, return None and rebuild
+        """ChromaDB handled persistence automatically, so we just 'build' (load)."""
+        return cls.build(corpus, settings)
 
     @classmethod
     def _select_embedder(cls, settings: AppSettings) -> BaseEmbedder:
@@ -178,46 +189,29 @@ class VectorIndex:
         return HashingEmbedder(dim=settings.vector_dim)
 
     def persist(self) -> None:
-        store_dir = self.settings.vector_store_path
-        store_dir.mkdir(parents=True, exist_ok=True)
-        metadata_path = store_dir / "index_metadata.json"
-        matrix_path = store_dir / "chunk_vectors.npy"
-        np.save(matrix_path, self.matrix)
-        metadata = {
-            "backend": self.embedder.backend_name,
-            "chunk_ids": self.chunk_ids,
-            "dim": int(self.matrix.shape[1]) if self.matrix.ndim == 2 and self.matrix.size else self.settings.vector_dim,
-        }
-        metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+        """ChromaDB PersistentClient persists automatically on write/upsert."""
+        pass
 
     def search(self, query: str, top_k: int) -> list[VectorSearchResult]:
-        if self.matrix.size == 0:
+        if self.collection.count() == 0:
             return []
-        query_vector = self._sanitize(self.embedder.embed_query(query))
-        scores = (self.matrix * query_vector).sum(axis=1, dtype=np.float32)
-        scores = np.nan_to_num(scores, nan=0.0, posinf=0.0, neginf=0.0)
-        ranked_indices = np.argsort(scores)[::-1][:top_k]
-        results: list[VectorSearchResult] = []
-        for idx in ranked_indices:
-            score = float(scores[idx])
-            if score <= 0:
+            
+        query_vector = self.embedder.embed_query(query).tolist()
+        
+        results = self.collection.query(
+            query_embeddings=[query_vector],
+            n_results=top_k
+        )
+        
+        ids = results.get("ids", [[]])[0]
+        distances = results.get("distances", [[]])[0]
+        
+        search_results: list[VectorSearchResult] = []
+        for chunk_id, dist in zip(ids, distances):
+            # Chroma distances for cosine are 1 - similarity
+            score = 1.0 - float(dist)
+            if score <= 0.05: # Low similarity threshold
                 continue
-            results.append(VectorSearchResult(chunk_id=self.chunk_ids[idx], score=score))
-        return results
-
-    def _sanitize(self, values: np.ndarray) -> np.ndarray:
-        array = np.asarray(values, dtype=np.float64)
-        array = np.nan_to_num(array, nan=0.0, posinf=0.0, neginf=0.0)
-        array = np.clip(array, -1.0e3, 1.0e3)
-        if array.ndim == 2:
-            norms = np.linalg.norm(array, axis=1, keepdims=True)
-            norms[norms == 0] = 1.0
-            normalized = array / norms
-            return np.clip(normalized, -1.0, 1.0).astype(np.float32)
-        if array.ndim == 1:
-            norm = np.linalg.norm(array)
-            norm = norm if norm != 0 else 1.0
-            normalized = array / norm
-            return np.clip(normalized, -1.0, 1.0).astype(np.float32)
-        self.logger.warning("Unexpected embedding shape encountered: %s", array.shape)
-        return array.astype(np.float32)
+            search_results.append(VectorSearchResult(chunk_id=chunk_id, score=score))
+            
+        return search_results

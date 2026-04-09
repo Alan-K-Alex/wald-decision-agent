@@ -26,9 +26,6 @@ class AppSettings(BaseModel):
     retrieval_backend: str = "auto"
     vector_store_dir: str = "outputs/vector_store"
     structured_store_path: str = "outputs/structured_memory.db"
-    memory_backend: str = "supermemory"
-    supermemory_container_tag: str = "wald-decision-agent"
-    supermemory_search_mode: str = "hybrid"
     log_level: str = "INFO"
     log_file: str = "outputs/logs/agent.log"
     plot_dpi: int = 150
@@ -64,10 +61,6 @@ class AppSettings(BaseModel):
         if self.llm_provider == "openai":
             return self.openai_api_key
         return self.groq_api_key or self.huggingface_api_key or self.gemini_api_key or self.openai_api_key
-
-    @property
-    def supermemory_api_key(self) -> str | None:
-        return os.getenv("SUPERMEMORY_API_KEY")
 
     @property
     def output_path(self) -> Path:
