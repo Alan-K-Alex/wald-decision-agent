@@ -76,6 +76,44 @@ class TestScenario1_TablesOnly:
         # Response should have key findings or evidence
         assert len(response.key_findings) > 0 or len(response.evidence) > 0
 
+    @pytest.mark.slow
+    def test_region_metric_breakdown_does_not_fall_back_to_ranking(self):
+        agent = LeadershipInsightAgent(
+            AppSettings(
+                enable_llm_formatting=False,
+                retrieval_backend="local",
+                memory_backend="none",
+                vector_backend="hash",
+                output_dir="outputs",
+            )
+        )
+
+        response = agent.ask("actual margin and gained for each regions ?", Path("data/raw"))
+
+        summary = response.executive_summary.lower()
+        assert "north america actual margin = 31.00".lower() in summary
+        assert "highest actual margin" not in summary
+        assert "grounded metric named `gained`" in response.executive_summary
+
+    @pytest.mark.slow
+    def test_q2_operational_costs_do_not_fall_back_to_non_temporal_cost_table(self):
+        agent = LeadershipInsightAgent(
+            AppSettings(
+                enable_llm_formatting=False,
+                retrieval_backend="local",
+                memory_backend="none",
+                vector_backend="hash",
+                output_dir="outputs",
+            )
+        )
+
+        response = agent.ask("operational costs q2 ?", Path("data/raw"))
+
+        summary = response.executive_summary.lower()
+        assert "do not see an explicit numeric q2 operational cost value" in summary
+        assert "ticket volume" in " ".join(response.key_findings).lower() or "onboarding" in " ".join(response.key_findings).lower()
+        assert "highest actual cost" not in summary
+
 
 class TestScenario2_MemoryContentOnly:
     """Scenario 2: Needs to refer to text content alone

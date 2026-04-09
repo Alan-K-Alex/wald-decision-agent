@@ -124,3 +124,9 @@ def test_api_response_includes_updated_title(chat_manager_fixture):
     # Verify title in response
     assert api_response["title"] == expected_title
     print("✓ Title matches expected value in API response!")
+
+
+def test_title_generator_falls_back_for_empty_question():
+    """Verify blank or punctuation-only questions still produce a usable title."""
+    assert _generate_title_from_question("") == "New Chat"
+    assert _generate_title_from_question("   ?  ") == "New Chat"

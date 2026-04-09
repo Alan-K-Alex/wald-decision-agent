@@ -8,7 +8,7 @@ from ..core.models import CalculationResult, VisualArtifact
 class VisualReasoner:
     def answer(self, question: str, visuals: list[VisualArtifact]) -> CalculationResult | None:
         lowered = question.lower()
-        if not any(term in lowered for term in ["chart", "graph", "visual", "figure"]):
+        if not any(term in lowered for term in ["chart", "graph", "visual", "figure", "trend", "quarterly"]):
             return None
         if not visuals:
             return None

@@ -93,8 +93,10 @@ class ChatResponse:
     question: str
     answer: str
     key_findings: list[str]
+    evidence: list[str] = field(default_factory=list)
     visual_insights: list[str] = field(default_factory=list)
     plots_base64: list[str] = field(default_factory=list)
+    plot_paths: list[str] = field(default_factory=list)
     source_summary: str = ""
     data_types_used: list[str] = field(default_factory=list)
     
@@ -104,8 +106,10 @@ class ChatResponse:
             "question": self.question,
             "answer": self.answer,
             "key_findings": self.key_findings,
+            "evidence": self.evidence,
             "visual_insights": self.visual_insights,
             "plots_base64": self.plots_base64,
+            "plot_paths": [str(p) for p in self.plot_paths],
             "source_summary": self.source_summary,
             "data_types_used": self.data_types_used,
         }
@@ -142,11 +146,29 @@ class AgentResponse:
             sections.append(("Plots", plot_body))
         return "\n\n".join(f"{title}\n{body}" for title, body in sections)
 
+    def to_display(self) -> str:
+        """Format a concise chat response with only user-facing sections."""
+        return self.to_chat_markdown()
+
+    def to_chat_markdown(self, plot_urls: list[str] | None = None) -> str:
+        """Export a concise markdown view for chat surfaces."""
+        sections = [
+            ("Executive Summary", self.executive_summary),
+            ("Key Findings", "\n".join(f"{idx}. {item}" for idx, item in enumerate(self.key_findings, start=1)) or "1. No findings generated."),
+            ("Evidence", "\n".join(f"- {item}" for item in self.evidence) or "- No evidence retrieved."),
+        ]
+
+        rendered_plot_urls = plot_urls or [str(path.resolve()) for path in self.plot_paths]
+        if rendered_plot_urls:
+            plot_body = "\n".join(f"![plot]({url})" for url in rendered_plot_urls)
+            sections.append(("Plots", plot_body))
+        return "\n\n".join(f"{title}\n{body}" for title, body in sections)
+
     def to_chat_response(self) -> ChatResponse:
-        """Convert to concise chat response (title + findings + plots only)
+        """Convert to concise chat response showing only Executive Summary, Key Findings, Evidence, and Plots
         
         Returns a lightweight response optimized for UI display.
-        Full details (evidence, calculations, etc.) are preserved in to_markdown()
+        Full details preserved in to_markdown() for reports.
         """
         # Infer data types from source references
         data_types = set()
@@ -158,13 +180,18 @@ class AgentResponse:
         if self.plot_base64 or self.plot_paths:
             data_types.add("visuals")
         
-        # Build concise response
+        # Prepare plot paths as strings for JSON serialization
+        plot_paths_str = [str(p) for p in self.plot_paths] if self.plot_paths else []
+        
+        # Build concise response with only essential sections
         return ChatResponse(
             question=self.question,
             answer=self.executive_summary,
-            key_findings=self.key_findings[:5],  # Limit to top 5
+            key_findings=self.key_findings,
+            evidence=self.evidence,
             visual_insights=self.visual_insights,
             plots_base64=[self.plot_base64] if self.plot_base64 else [],
+            plot_paths=plot_paths_str,
             source_summary=f"Referenced {len(self.source_references)} sources",
             data_types_used=list(data_types),
         )

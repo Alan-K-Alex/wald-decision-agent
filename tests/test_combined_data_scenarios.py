@@ -118,8 +118,49 @@ class TestCombinedDataScenarios:
         
         print(f"\n✓ Planned Approach: {response.planned_approach}")
         print(f"✓ Summary: {response.executive_summary[:150]}...")
+
+    @pytest.mark.slow
+    def test_combined_variance_and_trend_query_generates_multiple_plots(self):
+        agent = LeadershipInsightAgent()
+        question = "Why did Europe miss the plan and how has the quarterly revenue trend?"
+
+        response = agent.ask(question, Path("data/raw"), generate_plot=True)
+
+        assert len(response.plot_paths) >= 2
+        assert any("variance" in insight.lower() for insight in response.visual_insights)
+        assert any("quarterly revenue trend" in insight.lower() or "trend" in insight.lower() for insight in response.visual_insights)
+
+    @pytest.mark.slow
+    def test_combined_variance_and_trend_query_keeps_causal_narrative_and_linked_evidence(self):
+        settings = AppSettings(enable_llm_formatting=False, memory_backend="none", retrieval_backend="local", vector_backend="hash")
+        agent = LeadershipInsightAgent(settings)
+        question = "Why did Europe miss the plan and how has the quarterly revenue trend?"
+
+        response = agent.ask(question, Path("data/raw"), generate_plot=False)
+
+        summary_lower = response.executive_summary.lower()
+        assert "slower" in summary_lower or "enterprise conversions" in summary_lower
+        assert "trend" in summary_lower or "q1" in summary_lower
+        assert any(item.startswith("[") and "](" in item for item in response.evidence)
+        assert any(
+            any(marker in item.lower() for marker in ["because", "slower", "weaker channel execution", "mid-market"])
+            for item in response.evidence
+        )
         print(f"✓ Sources: {response.source_references}")
         assert len(response.source_references) > 0
+
+    @pytest.mark.slow
+    def test_operational_update_query_prefers_q2_update_document_over_generic_metric_answer(self):
+        settings = AppSettings(enable_llm_formatting=False, memory_backend="none", retrieval_backend="local", vector_backend="hash")
+        agent = LeadershipInsightAgent(settings)
+
+        response = agent.ask("operartional updates for Q2 ?", Path("data/raw"), generate_plot=False)
+
+        summary_lower = response.executive_summary.lower()
+        assert "engineering and sales" in summary_lower or "support and finance" in summary_lower
+        assert "revenue has the highest q2 2024 value" not in summary_lower
+        assert any("q2_operational_update.md" in item for item in response.evidence)
+        assert any("q2_operational_update.md" in item for item in response.source_references)
 
 
 class TestPlotGenerationAndEmbedding:

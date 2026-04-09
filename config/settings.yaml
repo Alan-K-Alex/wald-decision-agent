@@ -5,7 +5,7 @@ top_k: 5
 chat_model: gemini-2.5-flash
 vision_model: gemini-2.5-flash
 embedding_model: gemini-embedding-001
-llm_provider: gemini
+llm_provider: groq
 enable_llm_formatting: true
 vector_backend: auto
 vector_dim: 256

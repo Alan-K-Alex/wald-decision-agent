@@ -28,6 +28,8 @@ def _generate_title_from_question(question: str, max_words: int = 7) -> str:
     """
     # Remove leading/trailing whitespace and question marks
     cleaned = question.strip().rstrip('?').strip()
+    if not cleaned:
+        return "New Chat"
     # Split into words and take first max_words
     words = cleaned.split()
     title = " ".join(words[:max_words])
@@ -87,9 +89,10 @@ class ChatManager:
         (artifacts_dir / "reports").mkdir(parents=True, exist_ok=True)
         (artifacts_dir / "plots").mkdir(parents=True, exist_ok=True)
         now = _utc_now()
+        resolved_title = (title or "").strip() or "New Chat"
         session = ChatSession(
             chat_id=chat_id,
-            title=title or "New Chat",
+            title=resolved_title,
             created_at=now,
             updated_at=now,
             root_dir=root_dir,
@@ -228,18 +231,33 @@ class ChatManager:
         
         self.logger.info("Deleted all uploaded documents for chat %s", session.chat_id)
 
-    def record_exchange(self, session: ChatSession, question: str, response: AgentResponse) -> None:
+    def record_exchange(
+        self,
+        session: ChatSession,
+        question: str,
+        response: AgentResponse,
+        evidence: list[str] | None = None,
+        plot_urls: list[str] | None = None,
+        markdown: str | None = None,
+    ) -> None:
         messages = self.load_messages(session)
         messages.append({"role": "user", "content": question, "timestamp": _utc_now()})
         report_path = session.artifacts_dir / "reports" / f"{slugify(question)}.md"
+        resolved_plot_urls = plot_urls or [f"/artifacts/{session.chat_id}/artifacts/plots/{path.name}" for path in response.plot_paths]
+        resolved_evidence = evidence or response.evidence
         messages.append(
             {
                 "role": "assistant",
                 "content": response.executive_summary,
                 "timestamp": _utc_now(),
+                "answer": response.executive_summary,
+                "key_findings": response.key_findings,
+                "evidence": resolved_evidence,
+                "visual_insights": response.visual_insights,
                 "plot_paths": [str(path) for path in response.plot_paths],
+                "plot_urls": resolved_plot_urls,
                 "report_path": str(report_path),
-                "markdown": response.to_markdown(),
+                "markdown": markdown or response.to_chat_markdown(plot_urls=resolved_plot_urls),
             }
         )
         title = session.title if session.title != "New Chat" else _generate_title_from_question(question)

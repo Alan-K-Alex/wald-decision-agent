@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import argparse
 import json
+from dotenv import load_dotenv
 
 from .core.agent import LeadershipInsightAgent
 from .evaluation.evaluate import EvaluationRunner
 from .web import create_app
+
+# Load environment variables from .env file at startup
+load_dotenv()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -33,7 +37,9 @@ def main() -> None:
     if args.command == "ask":
         agent = LeadershipInsightAgent()
         response = agent.ask(question=args.question, docs_path=args.docs, generate_plot=args.plot)
-        print(response.to_markdown())
+        # Display simplified chat response (Executive Summary, Key Findings, Evidence, Plots)
+        # Full report available via response.to_markdown()
+        print(response.to_display())
         return
 
     if args.command == "evaluate":

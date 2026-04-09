@@ -17,7 +17,7 @@ class AppSettings(BaseModel):
     chat_model: str = "gemini-2.5-flash"
     vision_model: str = "gemini-2.5-flash"
     embedding_model: str = "gemini-embedding-001"
-    llm_provider: str = "gemini"
+    llm_provider: str = "huggingface"
     enable_llm_formatting: bool = True
     vector_backend: str = "auto"
     vector_dim: int = 256
@@ -46,12 +46,24 @@ class AppSettings(BaseModel):
         return os.getenv("GEMINI_API_KEY")
 
     @property
+    def huggingface_api_key(self) -> str | None:
+        return os.getenv("HUGGINGFACE_API_KEY")
+
+    @property
+    def groq_api_key(self) -> str | None:
+        return os.getenv("GROQ_API_KEY")
+
+    @property
     def active_api_key(self) -> str | None:
+        if self.llm_provider == "groq":
+            return self.groq_api_key
+        if self.llm_provider == "huggingface":
+            return self.huggingface_api_key
         if self.llm_provider == "gemini":
             return self.gemini_api_key
         if self.llm_provider == "openai":
             return self.openai_api_key
-        return self.gemini_api_key or self.openai_api_key
+        return self.groq_api_key or self.huggingface_api_key or self.gemini_api_key or self.openai_api_key
 
     @property
     def supermemory_api_key(self) -> str | None:
