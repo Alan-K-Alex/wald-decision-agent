@@ -90,7 +90,7 @@ PYTHONPATH=src python -m wald_decision_agent.main ask --docs data/raw --question
 
 ### 🎥 Video Walkthrough
 
-<video src="assets/wald%20demo.mov" controls="controls" width="100%"></video>
+[**▶️ Click here to watch the Wald Decision Agent Demo**](https://drive.google.com/file/d/1XH8Az7L7ZzQkExgt3igytLRcr273_VqK/view?usp=sharing)
 
 ---
 
