@@ -6,41 +6,37 @@ Wald Decision Agent is a grounded document intelligence system for enterprise fi
 
 The system is designed for mixed-document analysis across:
 
-- `PDF`
-- `DOCX`
-- `XLSX` / `XLS`
-- `CSV` / `TSV`
-- `TXT` / `MD`
-- visual attachments such as charts and scanned pages
+- `PDF` (Financial reports, strategy packs)
+- `DOCX` (Meeting minutes, project briefs)
+- `XLSX` / `XLS` (Budgets, targets, row-level data)
+- `CSV` / `TSV` (Risk registers, simple tables)
+- `TXT` / `MD` (Narrative notes, executive summaries)
+- **Visual Evidence**: Integrated OCR and vision analysis for charts and scanned pages.
 
 It combines:
 
-- document retrieval for narrative questions
-- SQLite-backed structured reasoning for tables
-- deterministic numeric computation for calculations
-- planner-based routing to choose the right path per query
-- Groq-based answer formatting by default
-- ChromaDB for persistent, high-performance vector storage
-- Gemini for vision extraction and embeddings
+- **Grounded Retrieval**: Narrative questions are answered with precise source citations.
+- **Structured Reasoning**: Tables are processed into SQLite for complex joins and filters.
+- **Deterministic Calculator**: Math and metrics are calculated using code, not LLM estimation.
+- **Visual Reasoner**: Charts (SVG/PNG) are interpreted via Gemini Vision for data extraction.
+- **ChromaDB Backbone**: Persistent, local vector storage for fast, reliable search.
+- **Groq Acceleration**: High-speed answer synthesis using Llama-3-70B.
 
 ## Key Features
 
-- Chat-style web interface for uploading document folders and asking questions
-- Chat-scoped storage so each chat keeps its own files, SQLite database, plots, and reports
-- Add, replace, or delete uploaded documents without deleting the chat
-- Spreadsheet-aware ingestion that preserves table structure
-- Grounded answers with references to the uploaded source files
-- Safe handling of unsupported or missing metrics by abstaining instead of guessing
-- Plot generation for supported trend and comparison questions
-- Professional HNSW indexing for sub-second retrieval on large file sets
+- **Chat-scoped Intelligence**: Each conversation maintains its own isolated context, files, and database.
+- **Dynamic Ingestion**: Add or replace documents in real-time without losing conversation history.
+- **Precision Metrics**: Surgical entity lookup for specific regions (APAC, EMEA) or departments (Finance, Engineering).
+- **Proactive Visualization**: Generates bar charts and line graphs when the data supports visual comparison.
+- **Follow-up Suggestions**: Suggests logical next questions based on the current context.
 
 ## Requirements
 
 - Python `3.9+`
 - `pip`
-- API keys:
-  - `GROQ_API_KEY` (Primary for answer formatting)
-  - `GEMINI_API_KEY` (For vision extraction and embeddings)
+- API keys in `.env`:
+  - `GROQ_API_KEY`: Primary for high-speed answer formatting.
+  - `GEMINI_API_KEY`: Used for OCR, vision extraction, and embeddings.
 
 ## Setup
 
@@ -60,64 +56,35 @@ pip install -r requirements.txt
 copy .env.example .env
 ```
 
-Example `.env`:
+## How to Run
 
-```env
-GROQ_API_KEY=your_key_here
-GEMINI_API_KEY=your_key_here
-```
-
-
-## Run The Web App
-
-### macOS / Linux
+### Start the Web App
 ```bash
 PYTHONPATH=src python -m wald_decision_agent.main serve --host 0.0.0.0 --port 8000
 ```
-
-### Windows
-```bash
-set PYTHONPATH=src
-python -m wald_decision_agent.main serve --host 0.0.0.0 --port 8000
-```
-
 Then open [http://localhost:8000](http://localhost:8000).
 
-## How to Test
-
-To see the system in action:
-
-1. **Upload Data**: You can use the sample business documents provided in the `data/raw/` folder. Simply upload this folder during the "Upload Folder" step in the UI.
-2. **Ask Questions**: Try asking questions from the `data/sample_questions/` folder to see how the agent handles structured, narrative, and visual data.
-3. **Review Reports**: After an answer is generated, check the grounded evidence, source links, and any generated plots.
-
-## Run From The CLI
-
+### CLI Mode (Single Question)
 ```bash
-PYTHONPATH=src python -m wald_decision_agent.main ask --docs data/raw --question "What is our current revenue trend?" --plot
+PYTHONPATH=src python -m wald_decision_agent.main ask --docs data/raw --question "In the strategy_performance_pack.pdf, what is the revenue reported for APAC?"
 ```
 
-## Repository Layout
+## Architectural Assumptions & Decisions
 
-```text
-config/settings.yaml
-data/raw/               # Sample document folder for testing
-data/sample_questions/  # Sample questions to try
-src/wald_decision_agent/
-  core/
-  ingestion/
-  retrieval/
-  reasoning/
-  rendering/
-  web/
-```
+### 1. Why ChromaDB?
+We chose **ChromaDB** as the vector backbone for its **local-first persistence** and **HNSW graph performance**. Unlike cloud-only vector stores, ChromaDB keeps data inside the workspace, ensuring total privacy for sensitive business documents while providing sub-millisecond retrieval.
 
-# Architectural Assumptions
+### 2. Surgical Entity Lookup
+To combat "Context Truncation" (where LLMs miss specific rows in large tables), we implemented a dedicated **Entity Lookup Engine**. It detects mentions of specific regions or departments and performs a direct row-level scan of structured data, ensuring 100% precision for entity-specific queries.
 
-This system was built with several key engineering assumptions to ensure enterprise-grade reliability and accuracy:
+### 3. Abstention over Hallucination
+The agent is explicitly programmed to **abstain** rather than guess. If a metric cannot be found in the structured tables OR retrieved from the text, the agent will report the gap in the data rather than providing a generic summary.
 
-1. **Structured-First Priority**: For numeric, ranking, or performance-related queries, the agent prioritizes structured data (CSV/Excel) over narrative text. This ensures that quantitative answers are derived from raw data rather than potentially misinterpreted summaries.
-2. **Hybrid Reasoning Engine**: We assume that a single RAG (Retrieval-Augmented Generation) pipeline is insufficient for complex business queries. Instead, the agent uses a **Planner** to route queries between SQL execution (for lookups), a Deterministic Calculator (for math), and Vector Retrieval (for narrative context).
-3. **Multimodal Grounding**: Visual artifacts (charts/plots) are not treated as secondary. The system assumes that crucial business trends are often trapped in images; hence, a Gemini-powered **Visual Reasoner** is integrated into the core decision loop.
-4. **Isolated Knowledge Contexts**: To maintain security and data integrity, each chat session is architected as an isolated environment with its own dedicated ChromaDB collection, SQLite database, and file storage.
-5. **Abstention over Hallucination**: The system is tuned to favor accuracy over "helpfulness." If a requested metric or driver cannot be grounded in the provided files, the agent is instructed to state the limitation rather than attempt to infer or guess the result.
+### 4. Hybrid Reasoning
+The system uses a **Planner** to decide the best tools for each query:
+- **CalculationEngine**: For numeric lookups, rankings, and math.
+- **VisualReasoner**: For interpreting image-based charts.
+- **VectorRetriever**: For semantic and narrative context.
+
+---
+*Developed for the Adobe AI Engineer Task.*

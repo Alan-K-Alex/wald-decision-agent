@@ -23,7 +23,7 @@ class HybridRetriever:
             self.logger.warning("Failed to build vector index: %s. Falling back to lexical-only retrieval.", exc)
             self.vector_index = None
 
-    def search(self, query: str, top_k: int | None = None) -> list[RetrievedChunk]:
+    def search(self, query: str, top_k: int | None = None, source_filter: str | None = None) -> list[RetrievedChunk]:
         query_tokens = tokenize(query)
         if not query_tokens:
             return []
@@ -32,6 +32,10 @@ class HybridRetriever:
         k = top_k or self.settings.top_k
         lexical_scores: dict[str, float] = {}
         for chunk in self.corpus.chunks:
+            # If a source filter is active, skip chunks from other files
+            if source_filter and chunk.source_path.name != source_filter:
+                continue
+                
             chunk_tokens = tokenize(chunk.content)
             score = self._score_tokens(query_counter, chunk_tokens)
             if chunk.metadata.get("sheet_name") and chunk.metadata["sheet_name"].lower() in query.lower():
@@ -41,7 +45,7 @@ class HybridRetriever:
         vector_scores: dict[str, float] = {}
         if self.vector_index is not None:
             try:
-                vector_hits = self.vector_index.search(query, top_k=max(k * 3, k))
+                vector_hits = self.vector_index.search(query, top_k=max(k * 3, k), source_filter=source_filter)
                 vector_scores = {item.chunk_id: item.score for item in vector_hits}
             except Exception as exc:
                 self.logger.debug("Vector search failed, using lexical-only scores: %s", exc)

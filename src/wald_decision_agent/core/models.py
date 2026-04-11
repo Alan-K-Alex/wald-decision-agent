@@ -65,6 +65,7 @@ class QueryPlan:
     route_sequence: list[str]
     reasoning: list[str]
     should_visualize: bool = False
+    filename_filter: str | None = None
     require_strict_grounding: bool = True
     max_sources: int = 5
 

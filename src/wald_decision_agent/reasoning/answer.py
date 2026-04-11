@@ -93,7 +93,7 @@ class AnswerComposer:
         the fallback response (when LLM is unavailable).
         """
         # Filter to high-relevance chunks only (minimal safeguard for fallback)
-        high_quality_retrieved = self._filter_by_relevance(question, retrieved)
+        high_quality_retrieved = self._filter_by_relevance(question, retrieved, plan=plan)
         
         # Collect all relevant evidence snippets
         evidence = []
@@ -168,7 +168,7 @@ class AnswerComposer:
                 evidence = [f"Structured evidence: {finding}" for finding in key_findings[:3]]
         else:
             # Fallback to document retrieval
-            if self._has_sufficient_grounding(question, high_quality_retrieved):
+            if self._has_sufficient_grounding(question, high_quality_retrieved, plan):
                 if self._is_temporal_metric_gap_question(question, high_quality_retrieved):
                     return self._build_temporal_metric_gap_response(
                         question=question,
@@ -214,13 +214,24 @@ class AnswerComposer:
         retrieved: list[RetrievedChunk],
         calculation: CalculationResult | None,
     ) -> bool:
+        if plan.filename_filter and any(ext in plan.filename_filter.lower() for ext in [".pdf", ".docx", ".doc", ".md", ".txt"]):
+            # If we have a valid calculation with explicit findings, don't suppress it 
+            # unless the user explicitly requested narrative text/definitions.
+            if calculation and calculation.findings and not self._is_definition_seeking_question(question):
+                return False
+            return self._has_sufficient_grounding(question, retrieved, plan)
+            
+        # If question is explanatory ("reasons", "why"), prioritize narrative if available
+        if self._is_explanatory_question(question) and self._has_sufficient_grounding(question, retrieved, plan):
+            return True
+
         if plan.primary_route != "retrieval":
             return False
         if not calculation or not retrieved:
             return False
         if not self._is_update_or_brief_question(question):
             return False
-        return self._has_sufficient_grounding(question, retrieved)
+        return self._has_sufficient_grounding(question, retrieved, plan)
 
     def _build_retrieval_led_response(
         self,
@@ -313,7 +324,7 @@ class AnswerComposer:
 
     def _is_explanatory_question(self, question: str) -> bool:
         lowered = question.lower()
-        return any(term in lowered for term in ["why", "because", "driver", "drivers", "caused", "reason"])
+        return any(term in lowered for term in ["why", "because", "driver", "reason", "caused", "performance", "explain", "summarize"])
 
     def _extract_causal_context(self, question: str, retrieved: list[RetrievedChunk]) -> tuple[str | None, str | None]:
         query_tokens = self._significant_tokens(question)
@@ -323,9 +334,13 @@ class AnswerComposer:
         for item in retrieved:
             for sentence in self._split_sentences(item.chunk.content):
                 lowered = sentence.lower()
-                if not any(marker in lowered for marker in ["because", "due to", "slower", "weaker", "pressure", "weakness"]):
+                # Very broad causal/performance markers
+                if not any(marker in lowered for marker in ["because", "due to", "driven by", "impact", "pressure", "weakness", "growth", "performance", "target"]):
                     continue
                 score = len(query_tokens & self._significant_tokens(sentence))
+                # Boost if sentence mentions both a metric-like term AND a dynamic term
+                if any(m in lowered for m in ["target", "plan", "revenue", "margin"]) and any(d in lowered for d in ["miss", "beat", "below", "above", "improved"]):
+                    score += 2
                 if score > best_score:
                     best_score = score
                     best_sentence = sentence
@@ -473,46 +488,60 @@ class AnswerComposer:
         logger.info("Fallback: trying all providers in order")
         return self._try_groq_formatting(response) or self._try_huggingface_formatting(response) or self._try_gemini_formatting(response) or self._try_openai_formatting(response)
 
-    def _filter_by_relevance(self, question: str, retrieved: list[RetrievedChunk], threshold: float = 0.3) -> list[RetrievedChunk]:
-        """Filter retrieved chunks to keep only those with sufficient relevance to the question.
-        
-        This is a minimal safeguard for the fallback response (when LLM is unavailable).
-        Prevents low-relevance chunks from polluting the answer.
-        """
+    def _filter_by_relevance(self, question: str, retrieved: list[RetrievedChunk], threshold: float = 0.3, plan: QueryPlan | None = None) -> list[RetrievedChunk]:
+        """Filter retrieved chunks to keep only those with sufficient relevance to the question."""
         if not retrieved:
             return []
         
-        query_tokens = self._significant_tokens(question)
+        query_tokens = self._significant_tokens(question, plan)
         if not query_tokens:
             return retrieved  # If question has no significant tokens, keep all
         
+        # If the user explicitly provided a filename filter, we trust their grounding more
+        active_filter = plan.filename_filter if plan else None
+        adjusted_threshold = 0.15 if active_filter else threshold
+        
         filtered = []
         for item in retrieved:
-            chunk_tokens = self._significant_tokens(item.chunk.content)
+            chunk_tokens = self._significant_tokens(item.chunk.content, plan)
             overlap = query_tokens & chunk_tokens
-            relevance_score = len(overlap) / max(len(query_tokens), len(chunk_tokens)) if chunk_tokens else 0
+            overlap_ratio = len(overlap) / max(len(query_tokens), 1)
             
-            # Keep only chunks with meaningful lexical support, not a single incidental match.
-            if relevance_score >= threshold or len(overlap) >= 2:
+            # Keep only chunks with meaningful lexical support OR strong semantic score
+            if overlap_ratio >= adjusted_threshold or len(overlap) >= 2 or (active_filter and item.score > 0.6):
                 filtered.append(item)
         
         return filtered
 
-    def _has_sufficient_grounding(self, question: str, retrieved: list[RetrievedChunk]) -> bool:
+    def _has_sufficient_grounding(self, question: str, retrieved: list[RetrievedChunk], plan: QueryPlan | None = None) -> bool:
         """Require strong enough support before answering from unstructured retrieval."""
         if not retrieved:
             return False
 
-        query_tokens = self._significant_tokens(question)
+        # If a plan is provided, use it for better token extraction
+        query_tokens = self._significant_tokens(question, plan)
         if not query_tokens:
             return False
 
         strong_matches = 0
-        for item in retrieved[:3]:
-            chunk_tokens = self._significant_tokens(item.chunk.content)
+        # If the user explicitly provided a filename filter, we trust their grounding more.
+        # We also allow the semantic score from the retriever to satisfy grounding.
+        filename_filter = plan.filename_filter if plan else None
+        threshold = 0.2 if filename_filter else 0.4
+        k_limit = 3
+        
+        for item in retrieved[:k_limit]:
+            # Semantic boost: if we have a very strong semantic hit in the requested file, it's grounded
+            if filename_filter and item.score > 0.6:
+                strong_matches += 1
+                continue
+                
+            chunk_tokens = self._significant_tokens(item.chunk.content, plan)
             overlap = query_tokens & chunk_tokens
             overlap_ratio = len(overlap) / max(len(query_tokens), 1)
-            if len(overlap) >= 2 or overlap_ratio >= 0.4:
+            
+            # Lowered threshold for explicit files (lexical overlap of 1 significant token)
+            if (filename_filter and len(overlap) >= 1) or len(overlap) >= 2 or overlap_ratio >= threshold:
                 strong_matches += 1
 
         return strong_matches >= 1
@@ -536,14 +565,15 @@ class AnswerComposer:
             f"{style_rules}"
             "GROUNDING RULES:\n"
             "1. PRESERVE ALL factual values, metrics, percentages, and dates EXACTLY as they appear.\n"
-            "2. DO NOT add new facts, statistics, labels, or details not explicitly in the original report.\n"
-            "3. DO NOT speculate or infer beyond what the report states.\n"
-            "4. DO NOT remove citations or caveats.\n"
-            "5. If the report says 'Insufficient evidence', keep that language.\n"
-            "6. NEVER add or normalize units such as million, billion, M, K, USD, EUR, or percentages unless that exact unit is explicitly present in the source-backed report.\n"
-            "7. If a value appears without an explicit unit, keep it unitless and do not imply a currency scale.\n"
-            "8. Maintain the source references as-is.\n"
-            "9. Return ONLY valid JSON with keys: executive_summary, key_findings, calculations, evidence, caveats, source_references, visual_insights.\n\n"
+            "2. HYBRID SYNTHESIS: You MUST bridge numeric calculation results with narrative evidence snippets. Do not just list them; explain the relationship (e.g., 'Revenue missed target because of...').\n"
+            "3. DO NOT add new facts, statistics, labels, or details not explicitly in the original report.\n"
+            "4. DO NOT speculate or infer beyond what the report states.\n"
+            "5. DO NOT remove citations or caveats.\n"
+            "6. If the report says 'Insufficient evidence', keep that language.\n"
+            "7. NEVER add or normalize units such as million, billion, M, K, USD, EUR, or percentages unless that exact unit is explicitly present in the source-backed report.\n"
+            "8. If a value appears without an explicit unit, keep it unitless and do not imply a currency scale.\n"
+            "9. Maintain the source references as-is.\n"
+            "10. Return ONLY valid JSON with keys: executive_summary, key_findings, calculations, evidence, caveats, source_references, visual_insights.\n\n"
             f"REPORT TO REWRITE:\n{response.to_markdown()}"
         )
 
@@ -691,6 +721,10 @@ class AnswerComposer:
             term in lowered
             for term in ["million", "millions", "billion", "billions", "unit", "units", "currency", "usd", "assumed", "assumption", "specified"]
         )
+
+    def _is_definition_seeking_question(self, question: str) -> bool:
+        lowered = question.lower()
+        return any(term in lowered for term in ["meaning", "define", "definition", "stand for", "what is a", "what are the"])
 
     def _build_abstention_response(
         self,
@@ -918,8 +952,9 @@ class AnswerComposer:
         return compact_whitespace(snippet[:260])
 
     def _split_sentences(self, text: str) -> list[str]:
-        """Split text into sentences."""
-        return [compact_whitespace(part) for part in re.split(r"(?<=[.!?])\s+", text) if compact_whitespace(part)]
+        """Split text into sentences or lines (for tables)."""
+        # Split by sentence markers OR newlines to handle tables correctly
+        return [compact_whitespace(part) for part in re.split(r"(?:(?<=[.!?])\s+)|\n", text) if compact_whitespace(part)]
 
     def _reference_label(self, path: Path, metadata: dict[str, object]) -> str:
         """Generate a formatted reference label with relative path and metadata."""
@@ -954,36 +989,23 @@ class AnswerComposer:
         # Return markdown link format
         return f"[{display_text}]({link_path})"
 
-    def _significant_tokens(self, text: str) -> set[str]:
+    def _significant_tokens(self, text: str, plan: QueryPlan | None = None) -> set[str]:
         """Extract significant tokens from text (removes stopwords)."""
         text = self._normalize_query_text(text)
         stopwords = {
-            "what",
-            "which",
-            "does",
-            "show",
-            "the",
-            "our",
-            "all",
-            "across",
-            "current",
-            "is",
-            "are",
-            "was",
-            "were",
-            "by",
-            "of",
-            "and",
-            "to",
-            "for",
-            "in",
-            "on",
-            "trend",
-            "chart",
-            "graph",
-            "visual",
-            "question",
+            "what", "which", "does", "show", "the", "our", "all", "across", "current",
+            "is", "are", "was", "were", "by", "of", "and", "to", "for", "in", "on",
+            "trend", "chart", "graph", "visual", "question",
+            "pdf", "docx", "xlsx", "csv", "md", "txt",
         }
+        
+        # Also exclude the specific filename if we're filtering by it
+        if plan and plan.filename_filter:
+            stopwords.add(plan.filename_filter.lower())
+            # Add base filename too
+            base = plan.filename_filter.split('.')[0].lower()
+            stopwords.add(base)
+            
         normalized_tokens = [self._normalize_token(token) for token in tokenize(text)]
         return {
             token
@@ -1037,41 +1059,7 @@ class AnswerComposer:
         # Return markdown link format
         return f"[{display_text}]({link_path})"
 
-    def _significant_tokens(self, text: str) -> set[str]:
-        text = self._normalize_query_text(text)
-        stopwords = {
-            "what",
-            "which",
-            "does",
-            "show",
-            "the",
-            "our",
-            "all",
-            "across",
-            "current",
-            "is",
-            "are",
-            "was",
-            "were",
-            "by",
-            "of",
-            "and",
-            "to",
-            "for",
-            "in",
-            "on",
-            "trend",
-            "chart",
-            "graph",
-            "visual",
-            "question",
-        }
-        normalized_tokens = [self._normalize_token(token) for token in tokenize(text)]
-        return {
-            token
-            for token in normalized_tokens
-            if token and token not in stopwords and (len(token) > 2 or self._is_short_semantic_token(token))
-        }
+
 
     def _normalize_query_text(self, text: str) -> str:
         replacements = {

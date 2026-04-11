@@ -21,6 +21,11 @@ class CalculationEngine:
             result = self._explain_metric_method(question, tables)
             if result:
                 return result
+
+        # Precise entity lookup (e.g., APAC, Finance) should take priority over rankings
+        result = self._calculate_entity_lookup(question, tables)
+        if result:
+            return result
         if self._has_temporal_constraint(lowered):
             result = self._calculate_temporal_lookup(question, tables)
             if result:
@@ -638,6 +643,86 @@ class CalculationEngine:
             if series.notna().sum() >= max(2, len(frame) // 2):
                 numeric_columns.append(str(column))
         return numeric_columns
+
+    def _calculate_entity_lookup(self, question: str, tables: list[StructuredTable]) -> CalculationResult | None:
+        """Perform a precise lookup for a specific named entity (e.g. 'APAC', 'Finance')."""
+        entities = self._detect_entities(question)
+        if not entities:
+            return None
+        
+        target_metrics, _ = self._detect_metric_requests(question)
+        if not target_metrics:
+            # Fallback to general detect target metric
+            target_metrics = [self._detect_target_metric(question)]
+            
+        for table in tables:
+            frame = table.dataframe.copy()
+            dimension_col = self._best_dimension_column(frame, metric_col="")
+            if not dimension_col:
+                continue
+            
+            # Find the row for each entity
+            for entity in entities:
+                # Case-insensitive but exact word match preferred
+                mask = frame[dimension_col].astype(str).str.lower().str.contains(rf"\b{re.escape(entity.lower())}\b", regex=True)
+                matched_rows = frame[mask]
+                if matched_rows.empty:
+                    continue
+                
+                row = matched_rows.iloc[0]
+                findings = []
+                metrics_found = []
+                
+                # Extract requested metrics
+                for metric_req in target_metrics:
+                    metric_col = self._best_numeric_column(frame, metric_req)
+                    if metric_col and pd.notna(row[metric_col]):
+                        val = float(row[metric_col])
+                        findings.append(f"{entity} {metric_col}: {val:,.2f}")
+                        metrics_found.append((metric_col, val))
+                
+                if not findings:
+                    # If we found the entity but no specific metric, report default numeric columns
+                    numeric_cols = self._numeric_columns(frame)
+                    for col in numeric_cols[:2]: 
+                        if pd.notna(row[col]):
+                            findings.append(f"{entity} {col}: {float(row[col]):,.2f}")
+                            metrics_found.append((col, float(row[col])))
+
+                if findings:
+                    source_row = int(row["_source_row"]) if "_source_row" in row and pd.notna(row["_source_row"]) else "?"
+                    answer = f"The grounded values for {entity} are: " + "; ".join(findings) + "."
+                    trace = [
+                        f"Entity lookup resolved for '{entity}' from {table.source_path.name}.",
+                        f"Dimension column: {dimension_col}",
+                        f"Source row: {source_row}",
+                        f"Target metrics: {', '.join(target_metrics)}",
+                    ]
+                    return CalculationResult(
+                        answer=answer,
+                        findings=findings,
+                        trace=trace,
+                        evidence_refs=[
+                            f"[{table.source_path.name} [{table.metadata.get('sheet_name', 'Sheet1')} | row {source_row} | entity {entity}]]({table.source_path})"
+                        ],
+                        numeric_value=metrics_found[0][1] if metrics_found else 0.0,
+                    )
+        return None
+
+    def _detect_entities(self, question: str) -> list[str]:
+        """Detect known regions or departments in the question string."""
+        lowered = question.lower()
+        # Common high-confidence dimension labels
+        known_entities = [
+            "apac", "emea", "latam", "north america", "europe", "corporate",
+            "finance", "sales", "engineering", "marketing", "support", "operations",
+            "human resources", "it", "product"
+        ]
+        found = []
+        for entity in known_entities:
+            if re.search(rf"\b{re.escape(entity)}\b", lowered):
+                found.append(entity)
+        return found
 
     @staticmethod
     def _looks_temporal(column: object) -> bool:

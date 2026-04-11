@@ -15,6 +15,8 @@ __pycache__/
 notebooks/outputs/
 UNKNOWN.egg-info/
 
+scratch/
+
 outputs/
 outputs/logs/
 outputs/plots/

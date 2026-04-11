@@ -22,5 +22,23 @@
     "expected_keywords": ["europe", "variance", "target"],
     "expected_sources": ["regional_actuals.csv [Sheet1]", "regional_targets.csv [Sheet1]"],
     "generate_plot": true
+  },
+  {
+    "question": "According to the revenue_chart.svg, what was the specific revenue value in Q4?",
+    "expected_keywords": ["160", "Q4", "highest"],
+    "expected_sources": ["revenue_chart.svg"],
+    "generate_plot": false
+  },
+  {
+    "question": "In the strategy_performance_pack.pdf, what is the revenue and margin reported for APAC?",
+    "expected_keywords": ["63", "19", "APAC"],
+    "expected_sources": ["strategy_performance_pack.pdf"],
+    "generate_plot": false
+  },
+  {
+    "question": "Is the 'Hiring Delay' mentioned in the risk register affecting the Finance department's performance score?",
+    "expected_keywords": ["hiring delay", "finance", "67", "underperforming"],
+    "expected_sources": ["risk_register.csv", "department_scorecard.csv"],
+    "generate_plot": false
   }
 ]

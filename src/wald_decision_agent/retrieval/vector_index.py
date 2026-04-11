@@ -192,16 +192,25 @@ class VectorIndex:
         """ChromaDB PersistentClient persists automatically on write/upsert."""
         pass
 
-    def search(self, query: str, top_k: int) -> list[VectorSearchResult]:
+    def search(self, query: str, top_k: int, source_filter: str | None = None) -> list[VectorSearchResult]:
         if self.collection.count() == 0:
             return []
             
         query_vector = self.embedder.embed_query(query).tolist()
         
-        results = self.collection.query(
-            query_embeddings=[query_vector],
-            n_results=top_k
-        )
+        # Build search parameters
+        query_params = {
+            "query_embeddings": [query_vector],
+            "n_results": top_k
+        }
+        
+        # Add metadata filter if provided
+        if source_filter:
+            # ChromaDB 'where' clause for metadata filtering
+            query_params["where"] = {"source": source_filter}
+            self.logger.info("Applying ChromaDB metadata filter: %s", source_filter)
+        
+        results = self.collection.query(**query_params)
         
         ids = results.get("ids", [[]])[0]
         distances = results.get("distances", [[]])[0]
