@@ -9,7 +9,7 @@ from ..reasoning.sql_agent import SQLQueryAgent
 from ..reasoning.visual_reasoner import VisualReasoner
 from ..rendering.visualize import VisualizationEngine
 from .config import AppSettings
-from .models_v2 import Corpus, TablePreview
+from .models import Corpus, TablePreview
 
 
 class TableInspectionTool:

@@ -111,6 +111,12 @@ class ChatManager:
         chats: list[dict[str, Any]] = []
         for metadata_path in sorted(self.root.glob("*/chat.json"), reverse=True):
             chat = json.loads(metadata_path.read_text(encoding="utf-8"))
+            # Calculate doc_count for each chat to fix the sidebar display
+            docs_dir = metadata_path.parent / "docs"
+            if docs_dir.exists():
+                chat["doc_count"] = sum(1 for p in docs_dir.rglob("*") if p.is_file())
+            else:
+                chat["doc_count"] = 0
             chats.append(chat)
         return sorted(chats, key=lambda item: item["updated_at"], reverse=True)
 

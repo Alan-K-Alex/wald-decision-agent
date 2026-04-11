@@ -214,7 +214,7 @@ class AnswerComposer:
         retrieved: list[RetrievedChunk],
         calculation: CalculationResult | None,
     ) -> bool:
-        if plan.filename_filter and any(ext in plan.filename_filter.lower() for ext in [".pdf", ".docx", ".doc", ".md", ".txt"]):
+        if plan.filename_filters and any(any(ext in f.lower() for ext in [".pdf", ".docx", ".doc", ".md", ".txt"]) for f in plan.filename_filters):
             # If we have a valid calculation with explicit findings, don't suppress it 
             # unless the user explicitly requested narrative text/definitions.
             if calculation and calculation.findings and not self._is_definition_seeking_question(question):
@@ -498,8 +498,8 @@ class AnswerComposer:
             return retrieved  # If question has no significant tokens, keep all
         
         # If the user explicitly provided a filename filter, we trust their grounding more
-        active_filter = plan.filename_filter if plan else None
-        adjusted_threshold = 0.15 if active_filter else threshold
+        active_filters = plan.filename_filters if plan else []
+        adjusted_threshold = 0.15 if active_filters else threshold
         
         filtered = []
         for item in retrieved:
@@ -508,7 +508,7 @@ class AnswerComposer:
             overlap_ratio = len(overlap) / max(len(query_tokens), 1)
             
             # Keep only chunks with meaningful lexical support OR strong semantic score
-            if overlap_ratio >= adjusted_threshold or len(overlap) >= 2 or (active_filter and item.score > 0.6):
+            if overlap_ratio >= adjusted_threshold or len(overlap) >= 2 or (active_filters and item.score > 0.6):
                 filtered.append(item)
         
         return filtered
@@ -526,13 +526,13 @@ class AnswerComposer:
         strong_matches = 0
         # If the user explicitly provided a filename filter, we trust their grounding more.
         # We also allow the semantic score from the retriever to satisfy grounding.
-        filename_filter = plan.filename_filter if plan else None
-        threshold = 0.2 if filename_filter else 0.4
+        filename_filters = plan.filename_filters if plan else []
+        threshold = 0.2 if filename_filters else 0.4
         k_limit = 3
         
         for item in retrieved[:k_limit]:
             # Semantic boost: if we have a very strong semantic hit in the requested file, it's grounded
-            if filename_filter and item.score > 0.6:
+            if filename_filters and item.score > 0.6:
                 strong_matches += 1
                 continue
                 
@@ -541,7 +541,7 @@ class AnswerComposer:
             overlap_ratio = len(overlap) / max(len(query_tokens), 1)
             
             # Lowered threshold for explicit files (lexical overlap of 1 significant token)
-            if (filename_filter and len(overlap) >= 1) or len(overlap) >= 2 or overlap_ratio >= threshold:
+            if (filename_filters and len(overlap) >= 1) or len(overlap) >= 2 or overlap_ratio >= threshold:
                 strong_matches += 1
 
         return strong_matches >= 1
@@ -1000,11 +1000,12 @@ class AnswerComposer:
         }
         
         # Also exclude the specific filename if we're filtering by it
-        if plan and plan.filename_filter:
-            stopwords.add(plan.filename_filter.lower())
-            # Add base filename too
-            base = plan.filename_filter.split('.')[0].lower()
-            stopwords.add(base)
+        if plan and plan.filename_filters:
+            for f in plan.filename_filters:
+                stopwords.add(f.lower())
+                # Add base filename too
+                base = f.split('.')[0].lower()
+                stopwords.add(base)
             
         normalized_tokens = [self._normalize_token(token) for token in tokenize(text)]
         return {

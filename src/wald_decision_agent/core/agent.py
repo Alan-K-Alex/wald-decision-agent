@@ -40,12 +40,12 @@ class LeadershipInsightAgent:
         self.logger.info("Planner route sequence: %s", " -> ".join(plan.route_sequence))
         corpus, catalog = self._prepare_context(docs_path)
         
-        # Apply strict filename filter to the corpus objects if plan defines it
-        if plan.filename_filter:
-            self.logger.info("Applying strict filename filter: %s", plan.filename_filter)
+        # Apply strict filename filters to the corpus objects if plan defines it
+        if plan.filename_filters:
+            self.logger.info("Applying strict filename filters: %s", plan.filename_filters)
             # Filter tables and visuals at the source
-            filtered_tables = {tid: t for tid, t in corpus.tables.items() if t.source_path.name == plan.filename_filter}
-            filtered_visuals = {vid: v for vid, v in corpus.visuals.items() if v.source_path.name == plan.filename_filter}
+            filtered_tables = {tid: t for tid, t in corpus.tables.items() if t.source_path.name in plan.filename_filters}
+            filtered_visuals = {vid: v for vid, v in corpus.visuals.items() if v.source_path.name in plan.filename_filters}
             corpus.tables = filtered_tables
             corpus.visuals = filtered_visuals
             
@@ -245,7 +245,7 @@ class LeadershipInsightAgent:
     def _retrieve_evidence(self, question: str, plan, corpus) -> list:
         # For narrative/retrieval-focused questions, do expanded retrieval
         retriever = HybridRetriever(corpus, self.settings)
-        local_results = retriever.search(question, source_filter=plan.filename_filter)
+        local_results = retriever.search(question, source_filter=plan.filename_filters)
         
         needs_explanation = any(term in question.lower() for term in ["why", "because", "driver", "drivers", "reason", "caused"])
 

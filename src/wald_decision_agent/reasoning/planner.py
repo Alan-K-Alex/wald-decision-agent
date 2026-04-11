@@ -34,10 +34,10 @@ class PlannerAgent:
         # Looks for words with common document extensions
         import re
         filename_matches = re.findall(r'[\w\-_]+\.(?:pdf|docx?|xlsx?|csv|md|txt|svg|png)', lowered)
-        filename_filter = filename_matches[0] if filename_matches else None
+        filename_filters = filename_matches if filename_matches else []
         
-        if filename_filter:
-            self.logger.info("Detected filename constraint in query: %s", filename_filter)
+        if filename_filters:
+            self.logger.info("Detected filename constraints in query: %s", filename_filters)
         
         if needs_explanation and has_structured_need:
             plan = QueryPlan(
@@ -50,14 +50,14 @@ class PlannerAgent:
                     "Answer composer will intelligently blend the sources.",
                 ],
                 should_visualize=should_visualize,
-                filename_filter=filename_filter,
+                filename_filters=filename_filters,
             )
             self.logger.debug("Planner selected mixed structured+narrative route for question: %s", question)
             return plan
 
         # If question is narrative in nature (about risks, priorities, improvements, etc.),
         # STILL fetch from SQL/calculator to have both sources available
-        if is_narrative_question and not has_structured_need and (requests_document_data or filename_filter):
+        if is_narrative_question and not has_structured_need and (requests_document_data or filename_filters):
             plan = QueryPlan(
                 primary_route="retrieval",
                 route_sequence=["retrieval", "sql", "calculator"],  # Try retrieval first but fetch all
@@ -68,14 +68,14 @@ class PlannerAgent:
                     "Answer composer will select the most appropriate source(s).",
                 ],
                 should_visualize=should_visualize,
-                filename_filter=filename_filter,
+                filename_filters=filename_filters,
             )
             self.logger.debug("Planner selected narrative-first route for question: %s", question)
             return plan
 
         if any(term in lowered for term in ["plan", "target", "variance", "missed", "beat"]):
             # But if user explicitly requested documents, prioritize retrieval
-            if requests_document_data or filename_filter:
+            if requests_document_data or filename_filters:
                 plan = QueryPlan(
                     primary_route="retrieval",
                     route_sequence=["retrieval", "sql", "calculator"],  # Added sql to sequence
@@ -85,7 +85,7 @@ class PlannerAgent:
                         "Also fetch structured data to support or validate retrieved insights.",
                     ],
                     should_visualize=should_visualize,
-                    filename_filter=filename_filter,
+                    filename_filters=filename_filters,
                 )
                 self.logger.debug("Planner selected retrieval route (document-explicit) for question: %s", question)
                 return plan
@@ -100,7 +100,7 @@ class PlannerAgent:
                     "Answer composer will blend numeric and narrative appropriately.",
                 ],
                 should_visualize=should_visualize,
-                filename_filter=filename_filter,
+                filename_filters=filename_filters,
             )
             self.logger.debug("Planner selected SQL route for question: %s", question)
             return plan
@@ -115,7 +115,7 @@ class PlannerAgent:
                     "Support with numeric/table tools and narrative context.",
                 ],
                 should_visualize=True,
-                filename_filter=filename_filter,
+                filename_filters=filename_filters,
             )
             self.logger.debug("Planner selected visual route for question: %s", question)
             return plan
@@ -134,7 +134,7 @@ class PlannerAgent:
                         "Support with numeric validation from tables.",
                     ],
                     should_visualize=should_visualize,
-                    filename_filter=filename_filter,
+                    filename_filters=filename_filters,
                 )
                 self.logger.debug("Planner selected narrative-first (hybrid numeric) route for question: %s", question)
                 return plan
@@ -149,7 +149,7 @@ class PlannerAgent:
                     "Answer composer selects the most relevant source(s).",
                 ],
                 should_visualize=should_visualize,
-                filename_filter=filename_filter,
+                filename_filters=filename_filters,
             )
             self.logger.debug("Planner selected calculator route for question: %s", question)
             return plan

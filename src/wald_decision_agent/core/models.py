@@ -60,12 +60,28 @@ class RetrievedChunk:
 
 
 @dataclass
+class TablePreview:
+    """Schema preview for intelligent query planning"""
+    table_name: str
+    source_file: str
+    row_count: int
+    columns: dict[str, str]  # column_name -> data_type
+    sample_rows: list[dict[str, Any]] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    
+    def column_summary(self) -> str:
+        """Get a human-readable column summary"""
+        cols = ", ".join([f"{name}({dtype})" for name, dtype in self.columns.items()])
+        return f"{self.table_name}: {cols}"
+
+
+@dataclass
 class QueryPlan:
     primary_route: str
     route_sequence: list[str]
     reasoning: list[str]
     should_visualize: bool = False
-    filename_filter: str | None = None
+    filename_filters: list[str] = field(default_factory=list)
     require_strict_grounding: bool = True
     max_sources: int = 5
 
@@ -86,6 +102,84 @@ class VisualizationResult:
     caption: str
     chart_type: str
     base64_image: str = ""  # Base64-encoded PNG image data
+
+
+@dataclass
+class SourceReference:
+    """Individual source reference with metadata"""
+    file_name: str
+    file_path: str
+    source_type: str  # "table", "document", "visual"
+    location: str | None = None  # e.g., "Sheet1, Row 5", "Page 3", "Chart 1"
+    relevance_score: float = 1.0
+
+
+@dataclass
+class EvidenceBundle:
+    """Collection of related evidence from a source"""
+    source_file: str
+    source_type: str  # "table", "document", "visual"
+    content: str  # Snippet or summary
+    location: str | None = None  # Page, row, sheet, etc.
+    relevance_score: float = 1.0
+    full_chunk_id: str = ""  # Reference to original chunk
+
+
+@dataclass
+class DetailedReport:
+    """Full analysis report with methodology, all evidence, and detailed findings"""
+    question: str
+    executive_summary: str
+    
+    # Methodology
+    planned_approach: list[str]  # Steps taken to answer
+    query_routing_logic: str  # Explanation of why routes were chosen
+    
+    # Detailed findings
+    detailed_findings: list[str]  # Long-form analysis
+    
+    # Evidence with context
+    evidence_bundles: list[EvidenceBundle] = field(default_factory=list)
+    
+    # Source information
+    source_references: list[SourceReference] = field(default_factory=list)
+    
+    # Trace information
+    calculations: list[str] = field(default_factory=list)
+    trace_steps: list[str] = field(default_factory=list)
+    
+    # Limitations
+    caveats: list[str] = field(default_factory=list)
+    
+    def to_markdown(self) -> str:
+        """Export as detailed markdown report"""
+        sections = [
+            ("Question", self.question),
+            ("Executive Summary", self.executive_summary),
+            ("Methodology", "\n".join(f"- {step}" for step in self.planned_approach)),
+            ("Detailed Findings", "\n".join(f"{i}. {f}" for i, f in enumerate(self.detailed_findings, 1))),
+            ("Evidence", self._format_evidence()),
+            ("Sources", self._format_sources()),
+            ("Caveats", "\n".join(f"- {c}" for c in self.caveats) if self.caveats else "None"),
+        ]
+        return "\n\n".join(f"## {title}\n{body}" for title, body in sections)
+    
+    def _format_evidence(self) -> str:
+        """Format evidence bundles"""
+        parts = []
+        for bundle in self.evidence_bundles:
+            parts.append(f"**{bundle.source_file}** (relevance: {bundle.relevance_score:.2%})")
+            parts.append(f"  {bundle.content[:200]}...")
+            parts.append("")
+        return "\n".join(parts) if parts else "No evidence"
+    
+    def _format_sources(self) -> str:
+        """Format source references"""
+        parts = []
+        for ref in self.source_references:
+            location = f" [{ref.location}]" if ref.location else ""
+            parts.append(f"- {ref.file_name}{location} ({ref.source_type})")
+        return "\n".join(parts) if parts else "No sources"
 
 
 @dataclass
