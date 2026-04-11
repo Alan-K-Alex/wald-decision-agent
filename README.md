@@ -2,6 +2,23 @@
 
 Wald Decision Agent is a grounded document intelligence system for enterprise files. It ingests business documents, preserves structured tables, answers questions with source-backed evidence, performs deterministic calculations for numeric queries, and generates plots when the data supports them.
 
+## Architectural Assumptions & Decisions
+
+### 1. Why ChromaDB?
+We chose **ChromaDB** as the vector backbone for its **local-first persistence** and **HNSW graph performance**. Unlike cloud-only vector stores, ChromaDB keeps data inside the workspace, ensuring total privacy for sensitive business documents while providing sub-millisecond retrieval.
+
+### 2. Surgical Entity Lookup
+To combat "Context Truncation" (where LLMs miss specific rows in large tables), we implemented a dedicated **Entity Lookup Engine**. It detects mentions of specific regions or departments and performs a direct row-level scan of structured data, ensuring 100% precision for entity-specific queries.
+
+### 3. Abstention over Hallucination
+The agent is explicitly programmed to **abstain** rather than guess. If a metric cannot be found in the structured tables OR retrieved from the text, the agent will report the gap in the data rather than providing a generic summary.
+
+### 4. Hybrid Reasoning
+The system uses a **Planner** to decide the best tools for each query:
+- **CalculationEngine**: For numeric lookups, rankings, and math.
+- **VisualReasoner**: For interpreting image-based charts.
+- **VectorRetriever**: For semantic and narrative context.
+
 ## Overview
 
 The system is designed for mixed-document analysis across:
@@ -68,23 +85,3 @@ Then open [http://localhost:8000](http://localhost:8000).
 ```bash
 PYTHONPATH=src python -m wald_decision_agent.main ask --docs data/raw --question "In the strategy_performance_pack.pdf, what is the revenue reported for APAC?"
 ```
-
-## Architectural Assumptions & Decisions
-
-### 1. Why ChromaDB?
-We chose **ChromaDB** as the vector backbone for its **local-first persistence** and **HNSW graph performance**. Unlike cloud-only vector stores, ChromaDB keeps data inside the workspace, ensuring total privacy for sensitive business documents while providing sub-millisecond retrieval.
-
-### 2. Surgical Entity Lookup
-To combat "Context Truncation" (where LLMs miss specific rows in large tables), we implemented a dedicated **Entity Lookup Engine**. It detects mentions of specific regions or departments and performs a direct row-level scan of structured data, ensuring 100% precision for entity-specific queries.
-
-### 3. Abstention over Hallucination
-The agent is explicitly programmed to **abstain** rather than guess. If a metric cannot be found in the structured tables OR retrieved from the text, the agent will report the gap in the data rather than providing a generic summary.
-
-### 4. Hybrid Reasoning
-The system uses a **Planner** to decide the best tools for each query:
-- **CalculationEngine**: For numeric lookups, rankings, and math.
-- **VisualReasoner**: For interpreting image-based charts.
-- **VectorRetriever**: For semantic and narrative context.
-
----
-*Developed for the Adobe AI Engineer Task.*
