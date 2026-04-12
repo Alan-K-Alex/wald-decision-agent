@@ -49,7 +49,7 @@ The system uses a **Planner** to decide the best tools for each query:
 
 ## Requirements
 
-- Python `3.9+`
+- Python `3.9+` (Python 3.9.6 preferrably)
 - `pip`
 - API keys in `.env`:
   - `GROQ_API_KEY`: Primary for high-speed answer formatting. *(Create one at [https://console.groq.com/keys](https://console.groq.com/keys))*
