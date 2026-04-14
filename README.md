@@ -77,13 +77,13 @@ copy .env.example .env
 
 ### Start the Web App
 ```bash
-PYTHONPATH=src python -m wald_decision_agent.main serve --host 0.0.0.0 --port 8000
+PYTHONPATH=src python -m src.wald_decision_agent.main serve --host 0.0.0.0 --port 8000
 ```
 Then open [http://localhost:8000](http://localhost:8000).
 
 ### CLI Mode (Single Question)
 ```bash
-PYTHONPATH=src python -m wald_decision_agent.main ask --docs data/raw --question "In the strategy_performance_pack.pdf, what is the revenue reported for APAC?"
+PYTHONPATH=src python -m src.wald_decision_agent.main ask --docs data/raw --question "In the strategy_performance_pack.pdf, what is the revenue reported for APAC?"
 ```
 
 ## Demo & Screenshots
